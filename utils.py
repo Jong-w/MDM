@@ -6,6 +6,7 @@ from gym.wrappers import AtariPreprocessing, TransformReward
 
 import torch
 import numpy as np
+import cv2
 
 from torch.distributions import Categorical
 
@@ -51,7 +52,6 @@ def atari_wrapper(env):
     env = ReturnWrapper(env)
     env = TransformReward(env, lambda r: np.sign(r))
     return env
-
 
 def make_envs(env_name, num_envs, seed=0):
     env_ = gym.make(env_name)

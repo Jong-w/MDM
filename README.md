@@ -1,5 +1,5 @@
-## Timely Hierarchical Elaborated FeUdal Networks
-### Standard Hierarchy addition method in Hierarchical Reinforcement Learning
+## Multi-hierarchy Dynamic Mechanism
+### MDM
 
 
 ![figure](img/슬라이드1.JPG)

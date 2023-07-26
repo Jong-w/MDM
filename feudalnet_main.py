@@ -10,58 +10,50 @@ import wandb
 
 parser = argparse.ArgumentParser(description='Feudal Nets')
 # GENERIC RL/MODEL PARAMETERS
-parser.add_argument('--lr', type=float, default=1e-3,
+parser.add_argument('--lr', type=float, default=0.0005,
                     help='learning rate')
-parser.add_argument('--env-name', type=str, default='FrostbiteNoFrameskip-v4',   #'MiniGrid-FourRooms-v0' 'MiniGrid-DoorKey-5x5-v0' 'MiniGrid-Empty-16x16-v0'
+parser.add_argument('--env-name', type=str, default='BreakoutNoFrameskip-v0',
                     help='gym environment name')
-parser.add_argument('--num-workers', type=int, default=64,
+parser.add_argument('--num-workers', type=int, default=16,
                     help='number of parallel environments to run')
-parser.add_argument('--num-steps', type=int, default=1000,
+parser.add_argument('--num-steps', type=int, default=400,
                     help='number of steps the agent takes before updating')
-parser.add_argument('--max-steps', type=int, default=int(3e7),
+parser.add_argument('--max-steps', type=int, default=int(1e8),
                     help='maximum number of training steps in total')
 parser.add_argument('--cuda', type=bool, default=True,
                     help='Add cuda')
-parser.add_argument('--grad-clip', type=float, default=1.,
+parser.add_argument('--grad-clip', type=float, default=5.,
                     help='Gradient clipping (recommended).')
-parser.add_argument('--entropy-coef', type=float, default=0.2,
+parser.add_argument('--entropy-coef', type=float, default=0.01,
                     help='Entropy coefficient to encourage exploration.')
-parser.add_argument('--mlp', type=int, default=1,
+parser.add_argument('--mlp', type=int, default=0,
                     help='toggle to feedforward ML architecture')
-parser.add_argument('--whole', type=int, default=1,
-                    help='use whole information of the env')
-parser.add_argument('--reward-reg', type=int, default=5000,
-                    help='reward regulaizer')
-parser.add_argument('--env-max-step', type=int, default=5000,
-                    help='max step for environment typically same as reward-reg')
-
-parser.add_argument('--grid-size', type=int, default=19,
-                    help='setting grid size')
 
 # SPECIFIC FEUDALNET PARAMETERS
 parser.add_argument('--time-horizon', type=int, default=10,
                     help='Manager horizon (c)')
 parser.add_argument('--hidden-dim-manager', type=int, default=256,
                     help='Hidden dim (d)')
-parser.add_argument('--hidden-dim-worker', type=int, default=128,
+parser.add_argument('--hidden-dim-worker', type=int, default=16,
                     help='Hidden dim for worker (k)')
-parser.add_argument('--gamma-w', type=float, default=0.9,
+parser.add_argument('--gamma-w', type=float, default=0.99,
                     help="discount factor worker")
-parser.add_argument('--gamma-m', type=float, default=0.99,
+parser.add_argument('--gamma-m', type=float, default=0.999,
                     help="discount factor manager")
-parser.add_argument('--alpha', type=float, default=0.2,
+parser.add_argument('--alpha', type=float, default=0.5,
                     help='Intrinsic reward coefficient in [0, 1]')
-parser.add_argument('--eps', type=float, default=float(1e-3),
+parser.add_argument('--eps', type=float, default=int(1e-5),
                     help='Random Gausian goal for exploration')
 parser.add_argument('--dilation', type=int, default=10,
                     help='Dilation parameter for manager LSTM.')
-
 
 # EXPERIMENT RELATED PARAMS
 parser.add_argument('--run-name', type=str, default='baseline',
                     help='run name for the logger.')
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
+
+args = parser.parse_args()
 
 args = parser.parse_args()
 def experiment(args):
@@ -80,7 +72,7 @@ def experiment(args):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-    envs = make_envs(args.env_name, args.num_workers, args.whole)
+    envs = make_envs(args.env_name, args.num_workers)
     feudalnet = FeudalNetwork(
         num_workers=args.num_workers,
         input_dim=envs.observation_space.shape,
@@ -91,8 +83,7 @@ def experiment(args):
         dilation=args.dilation,
         device=device,
         mlp=args.mlp,
-        args=args,
-        whole=args.whole)
+        args=args)
 
     optimizer = torch.optim.RMSprop(feudalnet.parameters(), lr=args.lr,
                                     alpha=0.99, eps=1e-5)
