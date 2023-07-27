@@ -268,8 +268,8 @@ class Hierarchy5_forth(nn.Module):
         goal, hidden = self.Mrnn(z, hidden)
         value_est = self.critic(goal)
 
-        if (self.eps > torch.rand(1)[0]):
-            goal = torch.randn_like(goal, requires_grad=False)
+        #if (self.eps > torch.rand(1)[0]):
+        #   goal = torch.randn_like(goal, requires_grad=False)
 
         return goal, hidden, value_est
 
@@ -317,8 +317,8 @@ class Hierarchy4_forth(nn.Module):
         goal, hidden = self.Mrnn(z, hidden)
         value_est = self.critic(goal)
 
-        if (self.eps > torch.rand(1)[0]):
-            goal = torch.randn_like(goal, requires_grad=False)
+        #if (self.eps > torch.rand(1)[0]):
+        #   goal = torch.randn_like(goal, requires_grad=False)
 
         return goal, hidden, value_est
 
@@ -366,8 +366,8 @@ class Hierarchy3_forth(nn.Module):
         goal, hidden = self.Mrnn(z, hidden)
         value_est = self.critic(goal)
 
-        if (self.eps > torch.rand(1)[0]):
-            goal = torch.randn_like(goal, requires_grad=False)
+        #if (self.eps > torch.rand(1)[0]):
+        #   goal = torch.randn_like(goal, requires_grad=False)
 
         return goal, hidden, value_est
 
@@ -416,8 +416,8 @@ class Hierarchy2_forth(nn.Module):
         goal, hidden = self.Mrnn(z, hidden)
         value_est = self.critic(goal)
 
-        if (self.eps > torch.rand(1)[0]):
-            goal = torch.randn_like(goal, requires_grad=False)
+        #if (self.eps > torch.rand(1)[0]):
+        #   goal = torch.randn_like(goal, requires_grad=False)
 
         return goal, hidden, value_est
 
