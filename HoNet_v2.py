@@ -233,18 +233,23 @@ class Policy_Network(nn.Module):
         drop_reward = (reward - (hierarchy_selected.sum(dim=1).reshape(self.num_workers, 1))) / (reward+1)
         return drop_reward
 
-
 class Goal_Normalizer(nn.Module):
     def __init__(self, hidden_dim):
         super().__init__()
         self.hidden_dim = hidden_dim
     def forward(self, goal_5, goal_4, goal_3, goal_2):
-        goal_cat = torch.cat(([goal_5, goal_4, goal_3, goal_2]), dim=1)
-        goal_all_norm = normalize(goal_cat)
-        goal_5_norm = goal_all_norm[:, :self.hidden_dim]
-        goal_4_norm = goal_all_norm[:, self.hidden_dim:self.hidden_dim*2]
-        goal_3_norm = goal_all_norm[:, self.hidden_dim*2:self.hidden_dim*3]
-        goal_2_norm = goal_all_norm[:, self.hidden_dim*3:self.hidden_dim*4]
+        #goal_cat = torch.cat(([goal_5, goal_4, goal_3, goal_2]), dim=1)
+        #goal_all_norm = normalize(goal_cat)
+        #goal_5_norm = goal_all_norm[:, :self.hidden_dim]
+        #goal_4_norm = goal_all_norm[:, self.hidden_dim:self.hidden_dim*2]
+        #goal_3_norm = goal_all_norm[:, self.hidden_dim*2:self.hidden_dim*3]
+        #goal_2_norm = goal_all_norm[:, self.hidden_dim*3:self.hidden_dim*4]
+        minimum = min(goal_5.min(), goal_4.min(), goal_3.min(), goal_2.min())
+        maximum = max(goal_5.max(), goal_4.max(), goal_3.max(), goal_2.max())
+        goal_5_norm = (goal_5 - minimum) / (maximum - minimum)
+        goal_4_norm = (goal_4 - minimum) / (maximum - minimum)
+        goal_3_norm = (goal_3 - minimum) / (maximum - minimum)
+        goal_2_norm = (goal_2 - minimum) / (maximum - minimum)
         return goal_5_norm, goal_4_norm, goal_3_norm, goal_2_norm
 
 
@@ -549,8 +554,8 @@ def mp_loss(storage, next_v_5, next_v_4, next_v_3, next_v_2, next_v_1, args):
     entropy = entropy.mean()
 
     hierarchy_drop_reward = hierarchy_drop_reward.mean()
-    # - loss_5 - loss_4 - loss_3 - loss_2 - loss_1
-    loss = ( + value_5_loss + value_4_loss + value_3_loss + value_2_loss + value_1_loss -
+
+    loss = ( - loss_5 - loss_4 - loss_3 - loss_2 - loss_1 + value_5_loss + value_4_loss + value_3_loss + value_2_loss + value_1_loss -
             - hierarchy_drop_reward) - args.entropy_coef * entropy
 
     return loss, {'loss/total_mp_loss': loss.item(),
