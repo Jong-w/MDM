@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='Honet')
 # GENERIC RL/MODEL PARAMETERS
 parser.add_argument('--dynamic', type=int, default=0,
                     help='dynamic_neural_network or not')
-parser.add_argument('--lr', type=float, default=0.0005,
+parser.add_argument('--lr', type=float, default=0.0002,
                     help='learning rate')
 parser.add_argument('--env-name', type=str, default='BreakoutNoFrameskip-v4',  #'MiniGrid-FourRooms-v0' 'MiniGrid-DoorKey-5x5-v0' 'MiniGrid-Empty-16x16-v0'
                     help='gym environment name')
@@ -88,7 +88,7 @@ def experiment(args):
 
     x = envs.reset()
     step = 0
-    train_eps = float(1e-6)
+    train_eps = float(1e-7)
     while step < args.max_steps:
         # Detaching LSTMs and goals_m
         HONETS.repackage_hidden()
@@ -134,10 +134,10 @@ def experiment(args):
                 'v_3': value_3,
                 'v_2': value_2,
                 'v_1': value_1,
-                'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goal_5_vanilla, masks, 5),
-                'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goal_4_vanilla, masks, 4),    #vanilla 사용하도록 수정
-                'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goal_3_vanilla, masks, 3),
-                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goal_2_vanilla, masks, 2)}
+                'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goals_5, masks, 5),
+                'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goals_4, masks, 4),    #vanilla 사용하도록 수정
+                'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goals_3, masks, 3),
+                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2)}
 
             for _i in range(len(done)):
                 if done[_i]:
@@ -152,9 +152,7 @@ def experiment(args):
 
         with torch.no_grad():
             _, _, _, next_v_5, _, next_v_4, _, next_v_3, _, next_v_2, next_v_1, _, _, _, _, _, _\
-                = HONETS(x, goals_5, states_total,
-                                                                                           goals_4, goals_3, goals_2,
-                                                                                           masks[-1], step, train_eps=0, save = False)
+                = HONETS(x, goals_5, states_total,goals_4, goals_3, goals_2, masks[-1], step, train_eps=0, save = False)
 
             next_v_5 = next_v_5.detach()
             next_v_4 = next_v_4.detach()
@@ -181,7 +179,7 @@ def experiment(args):
 
 def main(args):
     run_name = args.run_name
-    for seed in range(5):
+    for seed in range(1):
         wandb.init(project="MDM",
                    config=args.__dict__
                    )

@@ -6,7 +6,7 @@ from utils import init_hidden, weight_init
 from preprocess import Preprocessor
 from dilated_lstm import DilatedLSTM
 import numpy as np
-
+import random
 
 class HONET(nn.Module):
     def __init__(self,
@@ -34,7 +34,7 @@ class HONET(nn.Module):
 
         self.preprocessor = Preprocessor(input_dim, device, mlp=False)
         self.percept = Perception(self.hidden_dim[0],  self.time_horizon[0])
-        self.policy_network = Policy_Network(self.hidden_dim[0],  self.time_horizon[0], num_workers)
+        self.policy_network = Policy_Network(self.hidden_dim[0],  self.time_horizon[5], num_workers)
         self.Hierarchy5_forth = Hierarchy5_forth(self.time_horizon[4], self.hidden_dim[4], args, device)
         self.Hierarchy4_forth = Hierarchy4_forth(self.time_horizon[3], self.hidden_dim[3], args, device)
         self.Hierarchy3_forth = Hierarchy3_forth(self.time_horizon[2], self.hidden_dim[2], args, device)
@@ -99,15 +99,13 @@ class HONET(nn.Module):
 
         goal_5_norm, goal_4_norm, goal_3_norm, goal_2_norm = self.goal_normalizer(goal_5_vanilla, goal_4_vanilla, goal_3_vanilla, goal_2_vanilla)
 
-        self.hierarchies_selected = self.policy_network(z, goal_5_norm, goal_4_norm, goal_3_norm, self.hierarchies_selected, self.time_horizon,
+        if ((step % 300) == 0):
+            self.hierarchies_selected = self.policy_network(z, goal_5_norm, goal_4_norm, goal_3_norm, self.hierarchies_selected, self.time_horizon,
                                                    self.hidden_policy_network, mask, step)
-
-        if (train_eps > torch.rand(1)[0]) and ((step % self.time_horizon[5]) != 0):
-            self.hierarchies_selected[:, 0] = 1
-        if (train_eps > torch.rand(1)[0]) and ((step % self.time_horizon[5]) != 0):
-            self.hierarchies_selected[:, 1] = 1
-        if (train_eps > torch.rand(1)[0]) and ((step % self.time_horizon[5]) != 0):
-            self.hierarchies_selected[:, 2] = 1
+            if (train_eps > torch.rand(1)[0]) and ((step % 300) != 0):
+                self.hierarchies_selected[:, 0] = random.randrange(0,2)
+                self.hierarchies_selected[:, 1] = random.randrange(0,2)
+                self.hierarchies_selected[:, 2] = random.randrange(0,2)
         train_eps = train_eps * 0.99
 
         goal_5 = self.Hierarchy5_back(goal_5_norm, self.goal_0, self.hierarchies_selected[:, 0])
@@ -221,12 +219,6 @@ class Policy_Network(nn.Module):
         policy_network_result = policy_network_result - policy_network_result.min(1, keepdim=True)[0]
         policy_network_result = policy_network_result / policy_network_result.max(1, keepdim=True)[0]
         policy_network_result = policy_network_result.round()
-        if (step % time_horizon[5]) != 0:
-            policy_network_result[:, 0] = hierarchies_selected[:, 0]
-        if (step % time_horizon[4]) != 0:
-            policy_network_result[:, 1] = hierarchies_selected[:, 1]
-        if (step % time_horizon[3]) != 0:
-            policy_network_result[:, 2] = hierarchies_selected[:, 2]
         return policy_network_result.type(torch.int)
 
     def hierarchy_drop_reward(self, reward, hierarchy_selected):
@@ -555,7 +547,7 @@ def mp_loss(storage, next_v_5, next_v_4, next_v_3, next_v_2, next_v_1, args):
 
     hierarchy_drop_reward = hierarchy_drop_reward.mean()
 
-    loss = ( - loss_5 - loss_4 - loss_3 - loss_2 - loss_1 + value_5_loss + value_4_loss + value_3_loss + value_2_loss + value_1_loss -
+    loss = (- loss_5 - loss_4 - loss_3 - loss_2 - loss_1 + value_5_loss + value_4_loss + value_3_loss + value_2_loss + value_1_loss -
             - hierarchy_drop_reward) - args.entropy_coef * entropy
 
     return loss, {'loss/total_mp_loss': loss.item(),
