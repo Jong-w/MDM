@@ -1,5 +1,5 @@
 from logger import Logger
-from HoNet_v2 import HONET, mp_loss
+from HoNet_v2_2Hierarchy_check import HONET, mp_loss
 from utils import make_envs, take_action, init_obj
 from storage import Storage
 import wandb
@@ -13,11 +13,11 @@ parser.add_argument('--dynamic', type=int, default=0,
                     help='dynamic_neural_network or not')
 parser.add_argument('--lr', type=float, default=0.0005,
                     help='learning rate')
-parser.add_argument('--env-name', type=str, default='BreakoutNoFrameskip-v4',  #'MiniGrid-FourRooms-v0' 'MiniGrid-DoorKey-5x5-v0' 'MiniGrid-Empty-16x16-v0'
+parser.add_argument('--env-name', type=str, default='FrostbiteNoFrameskip-v4',
                     help='gym environment name')
-parser.add_argument('--num-workers', type=int, default=64,
+parser.add_argument('--num-workers', type=int, default=8,
                     help='number of parallel environments to run')
-parser.add_argument('--num-steps', type=int, default=1000,
+parser.add_argument('--num-steps', type=int, default=400,
                     help='number of steps the agent takes before updating')
 parser.add_argument('--max-steps', type=int, default=int(1e7),
                     help='maximum number of training steps in total')
@@ -25,32 +25,32 @@ parser.add_argument('--cuda', type=bool, default=True,
                     help='Add cuda')
 parser.add_argument('--grad-clip', type=float, default=5.,
                     help='Gradient clipping (recommended).')
-parser.add_argument('--entropy-coef', type=float, default=0.2,
+parser.add_argument('--entropy-coef', type=float, default=0.01,
                     help='Entropy coefficient to encourage exploration.')
 
 
 # SPECIFIC FEUDALNET PARAMETERS
-parser.add_argument('--gamma-5', type=float, default=0.99,
+parser.add_argument('--gamma-5', type=float, default=0.999,
                     help="discount factor worker")
-parser.add_argument('--gamma-4', type=float, default=0.95,
+parser.add_argument('--gamma-4', type=float, default=0.999,
                     help="discount factor supervisor")
-parser.add_argument('--gamma-3', type=float, default=0.9,
+parser.add_argument('--gamma-3', type=float, default=0.999,
                     help="discount factor manager")
-parser.add_argument('--gamma-2', type=float, default=0.85,
+parser.add_argument('--gamma-2', type=float, default=0.999,
                     help="discount factor worker")
-parser.add_argument('--gamma-1', type=float, default=0.8,
+parser.add_argument('--gamma-1', type=float, default=0.99,
                     help="discount factor supervisor")
-parser.add_argument('--alpha', type=float, default=0.4,
+parser.add_argument('--alpha', type=float, default=0.5,
                     help='Intrinsic reward coefficient in [0, 1]')
 parser.add_argument('--eps', type=float, default=float(1e-7),
                     help='Random Gausian goal for exploration')
-parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[84, 84, 84, 84, 84],
+parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[16, 256, 256, 256, 256],
                     help='Hidden dim (d)')
-parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 5, 15, 20, 25, 30],
+parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 15, 20, 25],
                     help=' horizon (c_s)')
 
 # EXPERIMENT RELATED PARAMS
-parser.add_argument('--run-name', type=str, default='BaseModel',
+parser.add_argument('--run-name', type=str, default='MDM',
                     help='run name for the logger.')
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
@@ -88,7 +88,7 @@ def experiment(args):
 
     x = envs.reset()
     step = 0
-    train_eps = 0#float(2e-1)
+    train_eps = float(1e-1)
     while step < args.max_steps:
         # Detaching LSTMs and goals_m
         HONETS.repackage_hidden()
@@ -105,8 +105,7 @@ def experiment(args):
 
 
         for _ in range(args.num_steps):
-            action_dist, goals_5, states_total, value_5, goals_4, value_4, goals_3, value_3, goals_2, value_2, value_1, hierarchies_selected, train_eps ,\
-            goal_5_vanilla, goal_4_vanilla, goal_3_vanilla, goal_2_vanilla \
+            action_dist, goals_5, states_total, value_5, goals_4, value_4, goals_3, value_3, goals_2, value_2, value_1, hierarchies_selected, train_eps \
                 = HONETS(x, goals_5, states_total, goals_4, goals_3, goals_2, masks[-1], step, train_eps)
 
             # Take a step, log the info, get the next state
@@ -151,9 +150,8 @@ def experiment(args):
             step += args.num_workers
 
         with torch.no_grad():
-            _, _, _, next_v_5, _, next_v_4, _, next_v_3, _, next_v_2, next_v_1, _, _, _, _, _, _ = HONETS(x, goals_5, states_total,
-                                                                                           goals_4, goals_3, goals_2,
-                                                                                           masks[-1], step, train_eps=0, save = False)
+            _, _, _, next_v_5, _, next_v_4, _, next_v_3, _, next_v_2, next_v_1, _, _ = HONETS(x, goals_5, states_total, goals_4, goals_3, goals_2, masks[-1], step, train_eps=0, save = False)
+
 
             next_v_5 = next_v_5.detach()
             next_v_4 = next_v_4.detach()
@@ -180,7 +178,7 @@ def experiment(args):
 
 def main(args):
     run_name = args.run_name
-    for seed in range(5):
+    for seed in range(1):
         wandb.init(project="MDM",
                    config=args.__dict__
                    )

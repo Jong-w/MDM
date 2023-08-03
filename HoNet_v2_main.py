@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='Honet')
 # GENERIC RL/MODEL PARAMETERS
 parser.add_argument('--dynamic', type=int, default=0,
                     help='dynamic_neural_network or not')
-parser.add_argument('--lr', type=float, default=0.0002,
+parser.add_argument('--lr', type=float, default=0.0005,
                     help='learning rate')
 parser.add_argument('--env-name', type=str, default='BreakoutNoFrameskip-v4',  #'MiniGrid-FourRooms-v0' 'MiniGrid-DoorKey-5x5-v0' 'MiniGrid-Empty-16x16-v0'
                     help='gym environment name')
@@ -88,7 +88,7 @@ def experiment(args):
 
     x = envs.reset()
     step = 0
-    train_eps = float(1e-7)
+    train_eps = float(1e-1)
     while step < args.max_steps:
         # Detaching LSTMs and goals_m
         HONETS.repackage_hidden()

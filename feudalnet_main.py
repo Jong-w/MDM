@@ -12,13 +12,13 @@ parser = argparse.ArgumentParser(description='Feudal Nets')
 # GENERIC RL/MODEL PARAMETERS
 parser.add_argument('--lr', type=float, default=0.0005,
                     help='learning rate')
-parser.add_argument('--env-name', type=str, default='BreakoutNoFrameskip-v0',
+parser.add_argument('--env-name', type=str, default='FrostbiteNoFrameskip-v4',
                     help='gym environment name')
-parser.add_argument('--num-workers', type=int, default=16,
+parser.add_argument('--num-workers', type=int, default=8,
                     help='number of parallel environments to run')
 parser.add_argument('--num-steps', type=int, default=400,
                     help='number of steps the agent takes before updating')
-parser.add_argument('--max-steps', type=int, default=int(1e8),
+parser.add_argument('--max-steps', type=int, default=int(1e7),
                     help='maximum number of training steps in total')
 parser.add_argument('--cuda', type=bool, default=True,
                     help='Add cuda')
@@ -48,7 +48,7 @@ parser.add_argument('--dilation', type=int, default=10,
                     help='Dilation parameter for manager LSTM.')
 
 # EXPERIMENT RELATED PARAMS
-parser.add_argument('--run-name', type=str, default='baseline',
+parser.add_argument('--run-name', type=str, default='FuN',
                     help='run name for the logger.')
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
@@ -146,6 +146,12 @@ def experiment(args):
 #                     "training/episode/length": infos[_i]['final_info']['returns/episodic_length'],
 #                     "training/episode/reward_sign": int(infos[_i]['final_info']['returns/episodic_reward']!=-1000)
 #                     },step=step)
+            for _i in range(len(done)):
+                if done[_i]:
+                    wandb.log(
+                        {"training/episode/reward": info[_i]['returns/episodic_reward'],
+                         "training/episode/length": info[_i]['returns/episodic_length']
+                         }, step=step)
 
 
             step += args.num_workers
@@ -179,7 +185,7 @@ def main(args):
     seed_size = [[128,64],[256,128],[512,256]]
     seed = 0
     for senum in range(0,5):
-        wandb.init(project="Frostbite_",
+        wandb.init(project="MDM",
         config=args.__dict__
         )
         args.seed = senum
