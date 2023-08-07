@@ -100,12 +100,13 @@ class HONET(nn.Module):
         goal_5_norm, goal_4_norm, goal_3_norm, goal_2_norm = self.goal_normalizer(goal_5_vanilla, goal_4_vanilla, goal_3_vanilla, goal_2_vanilla)
 
         if ((step % 300) == 0):
-            self.hierarchies_selected = self.policy_network(z, goal_5_norm, goal_4_norm, goal_3_norm, self.hierarchies_selected, self.time_horizon, self.hidden_policy_network, mask, step)
-            if (train_eps > torch.rand(1)[0]) and ((step % 300) != 0):
+            self.hierarchies_selected, hidden_policy_network = self.policy_network(z, goal_5_vanilla, goal_4_vanilla, goal_3_vanilla, self.hierarchies_selected, self.time_horizon, self.hidden_policy_network, mask, step)
+            if (train_eps > torch.rand(1)[0]):
                 self.hierarchies_selected[:, 0] = random.randrange(0,2)
                 self.hierarchies_selected[:, 1] = random.randrange(0,2)
                 self.hierarchies_selected[:, 2] = random.randrange(0,2)
-        train_eps = train_eps * 0.99
+            #if train_eps > 1e-7:
+            #    train_eps = train_eps * 0.99
 
         goal_5 = self.Hierarchy5_back(goal_5_norm, self.goal_0, self.hierarchies_selected[:, 0])
         goal_4 = self.Hierarchy4_back(goal_4_norm, goal_5, self.hierarchies_selected[:, 1])
@@ -142,6 +143,8 @@ class HONET(nn.Module):
             self.hidden_3 = hidden_3
             self.hidden_2 = hidden_2
             self.hidden_1 = hidden_1
+            if ((step % 300) == 0):
+                self.hidden_policy_network = hidden_policy_network
 
         return action_dist, goals_5, states_total, value_5, goals_4, value_4, goals_3, value_3, goals_2, value_2, value_1, self.hierarchies_selected, train_eps
         #return action_dist, goals_5, states_total, goals_4, goals_3, goals_2, value_2, value_1, self.hierarchies_selected, train_eps
@@ -210,15 +213,15 @@ class Policy_Network(nn.Module):
     def forward(self, z, goal_5_norm, goal_4_norm, goal_3_norm, hierarchies_selected, time_horizon, hidden, mask, step):
         goal_x_info = torch.cat(([goal_5_norm.detach(), goal_4_norm.detach(), goal_3_norm.detach(), z]), dim=1)
         hidden = (mask * hidden[0], mask * hidden[1])
-        policy_network_result_ = self.Mrnn(goal_x_info, hidden)
-        policy_network_result = policy_network_result_[0]
-        policy_network_result = policy_network_result - policy_network_result.min(1, keepdim=True)[0]
-        policy_network_result = policy_network_result / policy_network_result.max(1, keepdim=True)[0]
+        policy_network_result, hidden = self.Mrnn(goal_x_info, hidden)
+        policy_network_result = (policy_network_result - policy_network_result.detach().min(1, keepdim=True)[0]) / \
+                                (policy_network_result.detach().max(1, keepdim=True)[0] - policy_network_result.detach().min(1, keepdim=True)[0])
         policy_network_result = policy_network_result.round()
-        return policy_network_result.type(torch.int)
+        return policy_network_result.type(torch.int), hidden
 
     def hierarchy_drop_reward(self, reward, hierarchy_selected):
-        drop_reward = (reward - (hierarchy_selected.sum(dim=1).reshape(self.num_workers, 1))) / (reward+1)
+        #drop_reward = (reward - (hierarchy_selected.sum(dim=1).reshape(self.num_workers, 1))) / (reward+1)
+        drop_reward = reward
         return drop_reward
 
 class Goal_Normalizer(nn.Module):
@@ -526,17 +529,17 @@ def mp_loss(storage, next_v_5, next_v_4, next_v_3, next_v_2, next_v_1, args):
 
     advantage_5 = ret_5 - value_5
     loss_5 = (state_goal_5_cosines * advantage_5.detach()).mean()
-    hierarchy_selected_5 = hierarchy_selected[:, 2].float().mean()
+    hierarchy_selected_5 = hierarchy_selected[:, :, 0].float().mean()
     value_5_loss = 0.5 * advantage_5.pow(2).mean()
 
     advantage_4 = ret_4 - value_4
     loss_4 = (state_goal_4_cosines * advantage_4.detach()).mean()
-    hierarchy_selected_4 = hierarchy_selected[:, 1].float().mean()
+    hierarchy_selected_4 = hierarchy_selected[:, :, 1].float().mean()
     value_4_loss = 0.5 * advantage_4.pow(2).mean()
 
     advantage_3 = ret_3 - value_3
     loss_3 = (state_goal_3_cosines * advantage_3.detach()).mean()
-    hierarchy_selected_3 = hierarchy_selected[:, 0].float().mean()
+    hierarchy_selected_3 = hierarchy_selected[:, :, 2].float().mean()
     value_3_loss = 0.5 * advantage_3.pow(2).mean()
 
     advantage_2 = ret_2 - value_2

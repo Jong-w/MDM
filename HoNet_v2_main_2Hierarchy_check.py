@@ -15,11 +15,11 @@ parser.add_argument('--lr', type=float, default=0.0005,
                     help='learning rate')
 parser.add_argument('--env-name', type=str, default='FrostbiteNoFrameskip-v4',
                     help='gym environment name')
-parser.add_argument('--num-workers', type=int, default=8,
+parser.add_argument('--num-workers', type=int, default=32,
                     help='number of parallel environments to run')
 parser.add_argument('--num-steps', type=int, default=400,
                     help='number of steps the agent takes before updating')
-parser.add_argument('--max-steps', type=int, default=int(1e7),
+parser.add_argument('--max-steps', type=int, default=int(1e8),
                     help='maximum number of training steps in total')
 parser.add_argument('--cuda', type=bool, default=True,
                     help='Add cuda')
@@ -88,7 +88,7 @@ def experiment(args):
 
     x = envs.reset()
     step = 0
-    train_eps = float(1e-1)
+    train_eps = float(1e-7)
     while step < args.max_steps:
         # Detaching LSTMs and goals_m
         HONETS.repackage_hidden()
