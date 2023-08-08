@@ -36,9 +36,9 @@ parser.add_argument('--hidden-dim-manager', type=int, default=256,
                     help='Hidden dim (d)')
 parser.add_argument('--hidden-dim-worker', type=int, default=16,
                     help='Hidden dim for worker (k)')
-parser.add_argument('--gamma-w', type=float, default=0.99,
+parser.add_argument('--gamma-w', type=float, default=0.95,
                     help="discount factor worker")
-parser.add_argument('--gamma-m', type=float, default=0.999,
+parser.add_argument('--gamma-m', type=float, default=0.99,
                     help="discount factor manager")
 parser.add_argument('--alpha', type=float, default=0.5,
                     help='Intrinsic reward coefficient in [0, 1]')
