@@ -34,7 +34,7 @@ class HONET(nn.Module):
 
         self.preprocessor = Preprocessor(input_dim, device, mlp=False)
         self.percept = Perception(self.hidden_dim[-1],  self.time_horizon[0])
-        self.policy_network = Policy_Network(self.hidden_dim[-1],  700, num_workers)
+        self.policy_network = Policy_Network(self.hidden_dim[-1],  1000, num_workers)
         self.Hierarchy5_forth = Hierarchy5_forth(self.time_horizon[4], self.hidden_dim[4], args, device)
         self.Hierarchy4_forth = Hierarchy4_forth(self.time_horizon[3], self.hidden_dim[3], args, device)
         self.Hierarchy3_forth = Hierarchy3_forth(self.time_horizon[2], self.hidden_dim[2], args, device)
@@ -62,7 +62,7 @@ class HONET(nn.Module):
                                     device=device, grad=True)
         self.hidden_percept = init_hidden(args.num_workers, self.time_horizon[0] * self.hidden_dim[-1],
                                     device=device, grad=True)
-        self.hidden_policy_network = init_hidden(args.num_workers, 700 * 4 * self.hidden_dim[1],
+        self.hidden_policy_network = init_hidden(args.num_workers, 1000 * 4 * self.hidden_dim[1],
                                     device=device, grad=True)
 
         self.args = args
@@ -99,7 +99,7 @@ class HONET(nn.Module):
 
         goal_5_norm, goal_4_norm, goal_3_norm, goal_2_norm = self.goal_normalizer(goal_5_vanilla, goal_4_vanilla, goal_3_vanilla, goal_2_vanilla)
 
-        if ((step % 700) == 0):
+        if ((step % 1000) == 0):
             self.hierarchies_selected, hidden_policy_network = self.policy_network(z, goal_5_vanilla, goal_4_vanilla, goal_3_vanilla, self.hierarchies_selected, self.time_horizon, self.hidden_policy_network, mask, step)
             if (train_eps > torch.rand(1)[0]):
                 self.hierarchies_selected[:, 0] = random.randrange(0,2)
@@ -143,7 +143,7 @@ class HONET(nn.Module):
             self.hidden_3 = hidden_3
             self.hidden_2 = hidden_2
             self.hidden_1 = hidden_1
-            if ((step % 700) == 0):
+            if ((step % 1000) == 0):
                 self.hidden_policy_network = hidden_policy_network
 
         return action_dist, goals_5, states_total, value_5, goals_4, value_4, goals_3, value_3, goals_2, value_2, value_1, self.hierarchies_selected, train_eps
