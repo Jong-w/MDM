@@ -55,7 +55,7 @@ parser.add_argument('--run-name', type=str, default='MDM',
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
 
-parser.add_argument('--hierarchy-eps',type=float, default=1e-1)
+parser.add_argument('--hierarchy-eps',type=float, default=1e-7)
 
 args = parser.parse_args()
 
@@ -181,7 +181,7 @@ def experiment(args):
 def main(args):
     run_name = args.run_name
     for seed in range(1):
-        wandb.init(project="MDM_DK",
+        wandb.init(project="MDM",
                    config=args.__dict__
                    )
         args.seed = seed
