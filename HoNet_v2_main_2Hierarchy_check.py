@@ -55,7 +55,7 @@ parser.add_argument('--run-name', type=str, default='MDM',
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
 
-parser.add_argument('--hierarchy-eps',type=float, default=1e-7)
+parser.add_argument('--hierarchy-eps',type=float, default=1e-1)
 
 args = parser.parse_args()
 
