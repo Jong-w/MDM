@@ -179,7 +179,7 @@ def experiment(args):
 def main(args):
     run_name = args.run_name
     for seed in range(1):
-        wandb.init(project="MDM",
+        wandb.init(project="MDM_DK",
                    config=args.__dict__
                    )
         args.seed = seed
