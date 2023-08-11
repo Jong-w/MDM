@@ -1,5 +1,5 @@
 from logger import Logger
-from HoNet_v2 import HONET, mp_loss
+from MDM_5Hierarchies import HONET, mp_loss
 from utils import make_envs, take_action, init_obj
 from storage import Storage
 import wandb
@@ -126,7 +126,7 @@ def experiment(args):
                 'logp': logp.unsqueeze(-1),
                 'entropy': entropy.unsqueeze(-1),
                 'hierarchy_selected': hierarchies_selected,
-                'hierarchy_drop_reward': HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected),
+                #'hierarchy_drop_reward': HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected),
                 'm': mask,
                 'v_5': value_5,
                 'v_4': value_4,
@@ -136,8 +136,7 @@ def experiment(args):
                 'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goals_5, masks, 5),
                 'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goals_4, masks, 4),
                 'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goals_3, masks, 3),
-                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2)
-                    }
+                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2)}
 
             for _i in range(len(done)):
                 if done[_i]:
@@ -180,7 +179,7 @@ def experiment(args):
 def main(args):
     run_name = args.run_name
     for seed in range(1):
-        wandb.init(project="MDM",
+        wandb.init(project="MDM_Hierarchy_fixed",
                    config=args.__dict__
                    )
         args.seed = seed
