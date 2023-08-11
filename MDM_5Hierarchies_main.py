@@ -80,7 +80,7 @@ def experiment(args):
         dynamic=0,
         device=device,
         args=args)
-
+    HONETS = HONETS.to(device)
     # In orther to avoid gradient exploding, we apply gradient clipping.
     optimizer = torch.optim.RMSprop(HONETS.parameters(), lr=args.lr, alpha=0.99, eps=1e-5)
 
