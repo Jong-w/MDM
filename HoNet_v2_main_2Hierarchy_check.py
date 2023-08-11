@@ -55,6 +55,8 @@ parser.add_argument('--run-name', type=str, default='MDM',
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
 
+parser.add_argument('--hierarchy-eps',type=float, default=1e-1)
+
 args = parser.parse_args()
 
 def experiment(args):
@@ -88,7 +90,7 @@ def experiment(args):
 
     x = envs.reset()
     step = 0
-    train_eps = float(1e-7)
+    train_eps = float(args.hierarchy_eps)
     while step < args.max_steps:
         # Detaching LSTMs and goals_m
         HONETS.repackage_hidden()
@@ -179,7 +181,7 @@ def experiment(args):
 def main(args):
     run_name = args.run_name
     for seed in range(1):
-        wandb.init(project="MDM",
+        wandb.init(project="MDM_DK",
                    config=args.__dict__
                    )
         args.seed = seed

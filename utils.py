@@ -50,7 +50,7 @@ def atari_wrapper(env):
     # we retain all colour channels.
     env = AtariPreprocessing(env, grayscale_obs=False, scale_obs=True)
     env = ReturnWrapper(env)
-    env = TransformReward(env, lambda r: np.sign(r))
+    # env = TransformReward(env, lambda r: np.sign(r))
     return env
 
 def make_envs(env_name, num_envs, seed=0):

@@ -105,8 +105,7 @@ class HONET(nn.Module):
                 self.hierarchies_selected[:, 0] = random.randrange(0,2)
                 self.hierarchies_selected[:, 1] = random.randrange(0,2)
                 self.hierarchies_selected[:, 2] = random.randrange(0,2)
-            #if train_eps > 1e-7:
-            #    train_eps = train_eps * 0.99
+            train_eps = train_eps * 0.99
 
         goal_5 = self.Hierarchy5_back(goal_5_norm, self.goal_0, self.hierarchies_selected[:, 0])
         goal_4 = self.Hierarchy4_back(goal_4_norm, goal_5, self.hierarchies_selected[:, 1])
@@ -249,7 +248,6 @@ class Hierarchy5_forth(nn.Module):
         super().__init__()
         self.time_horizon = time_horizon  # Time Horizon
         self.hidden_dim = hidden_dim  # Hidden dimension size
-        self.eps = args.eps
         self.device = device
         self.Mrnn = DilatedLSTM(self.hidden_dim, self.hidden_dim, self.time_horizon)
         self.critic = nn.Linear(self.hidden_dim, 1)
@@ -258,10 +256,6 @@ class Hierarchy5_forth(nn.Module):
         hidden = (mask * hidden[0], mask * hidden[1])
         goal, hidden = self.Mrnn(z, hidden)
         value_est = self.critic(goal)
-
-        if (self.eps > torch.rand(1)[0]):
-           goal = torch.randn_like(goal, requires_grad=False)
-
         return goal, hidden, value_est
 
 class Hierarchy5_back(nn.Module):
@@ -269,7 +263,6 @@ class Hierarchy5_back(nn.Module):
         super().__init__()
         self.time_horizon = time_horizon  # Time Horizon
         self.hidden_dim = hidden_dim  # Hidden dimension size
-        self.eps = args.eps
         self.device = device
         self.linear = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.num_workers = num_workers
@@ -300,7 +293,6 @@ class Hierarchy4_forth(nn.Module):
         super().__init__()
         self.time_horizon = time_horizon  # Time Horizon
         self.hidden_dim = hidden_dim  # Hidden dimension size
-        self.eps = args.eps
         self.device = device
         self.Mrnn = DilatedLSTM(self.hidden_dim, self.hidden_dim, self.time_horizon)
         self.critic = nn.Linear(self.hidden_dim, 1)
@@ -310,9 +302,6 @@ class Hierarchy4_forth(nn.Module):
         goal, hidden = self.Mrnn(z, hidden)
         value_est = self.critic(goal)
 
-        if (self.eps > torch.rand(1)[0]):
-           goal = torch.randn_like(goal, requires_grad=False)
-
         return goal, hidden, value_est
 
 class Hierarchy4_back(nn.Module):
@@ -320,7 +309,6 @@ class Hierarchy4_back(nn.Module):
         super().__init__()
         self.time_horizon = time_horizon  # Time Horizon
         self.hidden_dim = hidden_dim  # Hidden dimension size
-        self.eps = args.eps
         self.device = device
         self.linear = nn.Linear(self.hidden_dim, self.hidden_dim, bias=False)
         self.num_workers = num_workers
@@ -351,7 +339,6 @@ class Hierarchy3_forth(nn.Module):
         super().__init__()
         self.time_horizon = time_horizon  # Time Horizon
         self.hidden_dim = hidden_dim  # Hidden dimension size
-        self.eps = args.eps
         self.device = device
         self.Mrnn = DilatedLSTM(self.hidden_dim, self.hidden_dim, self.time_horizon)
         self.critic = nn.Linear(self.hidden_dim, 1)
@@ -360,10 +347,6 @@ class Hierarchy3_forth(nn.Module):
         hidden = (mask * hidden[0], mask * hidden[1])
         goal, hidden = self.Mrnn(z, hidden)
         value_est = self.critic(goal)
-
-        if (self.eps > torch.rand(1)[0]):
-           goal = torch.randn_like(goal, requires_grad=False)
-
         return goal, hidden, value_est
 
 class Hierarchy3_back(nn.Module):
@@ -371,7 +354,6 @@ class Hierarchy3_back(nn.Module):
         super().__init__()
         self.time_horizon = time_horizon  # Time Horizon
         self.hidden_dim = hidden_dim  # Hidden dimension size
-        self.eps = args.eps
         self.device = device
         self.linear = nn.Linear(self.hidden_dim, self.hidden_dim, bias=False)
         self.num_workers = num_workers
@@ -402,7 +384,6 @@ class Hierarchy2_forth(nn.Module):
         super().__init__()
         self.time_horizon = time_horizon  # Time Horizon
         self.hidden_dim = hidden_dim  # Hidden dimension size
-        self.eps = args.eps
         self.device = device
         self.Mrnn = DilatedLSTM(self.hidden_dim, self.hidden_dim, self.time_horizon)
         self.space = nn.Linear(self.hidden_dim, self.hidden_dim)
@@ -412,10 +393,6 @@ class Hierarchy2_forth(nn.Module):
         hidden = (mask * hidden[0], mask * hidden[1])
         goal, hidden = self.Mrnn(z, hidden)
         value_est = self.critic(goal)
-
-        if (self.eps > torch.rand(1)[0]):
-           goal = torch.randn_like(goal, requires_grad=False)
-
         return goal, hidden, value_est
 
 class Hierarchy2_back(nn.Module):
@@ -423,7 +400,6 @@ class Hierarchy2_back(nn.Module):
         super().__init__()
         self.time_horizon = time_horizon  # Time Horizon
         self.hidden_dim = hidden_dim  # Hidden dimension size
-        self.eps = args.eps
         self.device = device
         self.linear = nn.Linear(self.hidden_dim, self.hidden_dim, bias=False)
 
