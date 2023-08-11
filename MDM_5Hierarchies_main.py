@@ -50,7 +50,7 @@ parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 15, 
                     help=' horizon (c_s)')
 
 # EXPERIMENT RELATED PARAMS
-parser.add_argument('--run-name', type=str, default='MDM',
+parser.add_argument('--run-name', type=str, default='MDM_fix5',
                     help='run name for the logger.')
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
@@ -179,7 +179,7 @@ def experiment(args):
 def main(args):
     run_name = args.run_name
     for seed in range(1):
-        wandb.init(project="MDM_Hierarchy_fixed",
+        wandb.init(project="MDM_DK",
                    config=args.__dict__
                    )
         args.seed = seed
