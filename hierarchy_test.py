@@ -7,7 +7,8 @@ import pickle
 import gzip
 import argparse
 import torch
-
+import cv2
+import numpy as np
 parser = argparse.ArgumentParser(description='Honet')
 # GENERIC RL/MODEL PARAMETERS
 parser.add_argument('--dynamic', type=int, default=0,
@@ -92,6 +93,9 @@ def experiment(args):
     hierarchy5_list = []
     hierarchy4_list = []
     hierarchy3_list = []
+    steps_list = []
+
+    reward_list = []
 
     while step < args.max_steps:
         # Detaching LSTMs and goals_m
@@ -101,7 +105,6 @@ def experiment(args):
         goals_3 = [g.detach() for g in goals_3]
         goals_2 = [g.detach() for g in goals_2]
 
-
         with torch.no_grad():
             for _ in range(args.num_steps):
                 action_dist, goals_5, states_total, value_5, goals_4, value_4, goals_3, value_3, goals_2, value_2, value_1, hierarchies_selected, train_eps \
@@ -110,37 +113,49 @@ def experiment(args):
                 # Take a step, log the info, get the next state
                 action, logp, entropy = take_action(action_dist)
                 x, reward, done, info = envs.step(action)
-
+                reward_list.append(reward[0])
                 logger.log_episode(info, step)
 
                 mask = torch.FloatTensor(1 - done).unsqueeze(-1).to(args.device)
                 masks.pop(0)
                 masks.append(mask)
 
-                #for episode_dict in info:
-                #    if not 'final_info' in episode_dict:
-                #        if episode_dict['returns/episodic_reward'] is not None:
-                #            wandb.log({"training/episode/reward": episode_dict['returns/episodic_reward'],
-                #                       "training/episode/length": episode_dict['returns/episodic_length']}, step=step)
-                #    else:
-                #        if episode_dict['final_info'] is not None:
-                #            wandb.log({"training/episode/reward": episode_dict['returns/episodic_reward'],
-                #                       "training/episode/length": episode_dict['returns/episodic_length']}, step=step)
 
-                #wandb.log(
-                #    {"training/episode/hierarchy5": hierarchies_selected[:, 0],
-                #    "training/episode/hierarchy4": hierarchies_selected[:, 1],
-                #    "training/episode/hierarchy3": hierarchies_selected[:, 2],
-                #    "training/episode/done": int(done[0])}, step=step)
+
+                log_episode = {}
+                for episode_dict in info:
+                   if not 'final_info' in episode_dict:
+                       if episode_dict['returns/episodic_reward'] is not None:
+                           log_episode = ({"training/episode/reward": episode_dict['returns/episodic_reward'],
+                                      "training/episode/length": episode_dict['returns/episodic_length'], 'step': step})
+                   else:
+                       if episode_dict['final_info'] is not None:
+                           log_episode = ({"training/episode/reward": episode_dict['returns/episodic_reward'],
+                                      "training/episode/length": episode_dict['returns/episodic_length'], 'step': step})
 
                 info_list.append(info[0]['returns/episodic_reward'])
-                hierarchy5_list.append(hierarchies_selected[:, 0])
-                hierarchy4_list.append(hierarchies_selected[:, 1])
-                hierarchy3_list.append(hierarchies_selected[:, 2])
-
+                hierarchy5_list.append(hierarchies_selected[:, 0].item())
+                hierarchy4_list.append(hierarchies_selected[:, 1].item())
+                hierarchy3_list.append(hierarchies_selected[:, 2].item())
+                steps_list.append(step)
                 step += args.num_workers
 
-    data = {"info": info_list,
+                # print if it is done
+                # print(done[0])
+                # print('reward:', reward[0])
+                if done[0]:
+                    # cv2.imwrite('curr{}.png'.format(step), (x * 255).squeeze())
+                    x, done[0] = envs.reset(), False
+                    goals_5, states_total, goals_4, goals_3, goals_2, masks = HONETS.init_obj()
+                    print('*' * 10)
+                    print('sum_reward:', np.sum(reward_list))
+                    print('max_reward:', np.max(reward_list))
+                    if np.max(reward_list)>100:
+                        print('')
+                    reward_list = []
+
+
+    data = {"reward": info_list,
             "hierarchy5": hierarchy5_list,
             "hierarchy4": hierarchy4_list,
             "hierarchy3": hierarchy3_list}
@@ -154,13 +169,13 @@ def experiment(args):
 def main(args):
     run_name = args.run_name
     for seed in range(1):
-        wandb.init(project="MDM",
-                   config=args.__dict__
-                   )
-        args.seed = seed
-        wandb.run.name = f"{run_name}_runseed={seed}"
+        # wandb.init(project="MDM",
+        #            config=args.__dict__
+        #            )
+        # args.seed = seed
+        # wandb.run.name = f"{run_name}_runseed={seed}"
         experiment(args)
-        wandb.finish()
+        # wandb.finish()
 
 
 if __name__ == '__main__':

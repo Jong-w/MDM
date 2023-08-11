@@ -15,7 +15,7 @@ class Logger:
 
         if not os.path.exists('logs'):
             os.makedirs('logs')
-            os.makedirs('models')
+            os.makedirs('models', exist_ok=True)
 
         self.writer = SummaryWriter(self.log_name)
 
