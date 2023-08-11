@@ -30,7 +30,7 @@ class HONET(nn.Module):
 
         template_0 = torch.zeros(self.num_workers, self.hidden_dim[4])
         self.goal_0 = [torch.zeros_like(template_0).to(self.device) for _ in range(2 * self.time_horizon[4] + 1)]
-        self.hierarchies_selected = torch.ones_like(torch.empty(self.num_workers, 3))
+        self.hierarchies_selected = torch.ones_like(torch.empty(self.num_workers, 3)).to(self.device)
 
         self.preprocessor = Preprocessor(input_dim, device, mlp=False)
         self.percept = Perception(self.hidden_dim[-1],  self.time_horizon[0])
@@ -523,9 +523,9 @@ def mp_loss(storage, next_v_5, next_v_4, next_v_3, next_v_2, next_v_1, args):
     storage.normalize(['ret_5', 'ret_4', 'ret_3', 'ret_2', 'ret_1'])
 
     rewards_intrinsic, value_5, value_4, value_3, value_2, value_1, ret_5, ret_4, ret_3, ret_2, ret_1, logps, entropy, \
-        state_goal_5_cosines, state_goal_4_cosines, state_goal_3_cosines, state_goal_2_cosines, hierarchy_selected, hierarchy_drop_reward = storage.stack(
+        state_goal_5_cosines, state_goal_4_cosines, state_goal_3_cosines, state_goal_2_cosines, hierarchy_selected = storage.stack(
         ['r_i', 'v_5', 'v_4', 'v_3', 'v_2', 'v_1', 'ret_5', 'ret_4', 'ret_3', 'ret_2', 'ret_1',
-         'logp', 'entropy', 'state_goal_5_cos', 'state_goal_4_cos', 'state_goal_3_cos', 'state_goal_2_cos', 'hierarchy_selected', 'hierarchy_drop_reward'])
+         'logp', 'entropy', 'state_goal_5_cos', 'state_goal_4_cos', 'state_goal_3_cos', 'state_goal_2_cos', 'hierarchy_selected'])
 
     advantage_5 = ret_5 - value_5
     loss_5 = (state_goal_5_cosines * advantage_5.detach()).mean()
@@ -575,7 +575,7 @@ def mp_loss(storage, next_v_5, next_v_4, next_v_3, next_v_2, next_v_1, args):
                   'hierarchy_use/hierarchy_selected_4': hierarchy_selected_4.item(),
                   'hierarchy_use/hierarchy_selected_3': hierarchy_selected_3.item(),
 
-                  'policy_network' : hierarchy_drop_reward,
+                  # 'policy_network' : hierarchy_drop_reward,
 
                   'value_Hierarchy_1/entropy': entropy.item(),
                   'value_Hierarchy_1/advantage': advantage_1.mean().item(),
