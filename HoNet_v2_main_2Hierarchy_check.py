@@ -6,7 +6,7 @@ import wandb
 
 import argparse
 import torch
-
+import gc
 parser = argparse.ArgumentParser(description='Honet')
 # GENERIC RL/MODEL PARAMETERS
 parser.add_argument('--dynamic', type=int, default=0,
@@ -17,7 +17,7 @@ parser.add_argument('--env-name', type=str, default='FrostbiteNoFrameskip-v4',
                     help='gym environment name')
 parser.add_argument('--num-workers', type=int, default=32,
                     help='number of parallel environments to run')
-parser.add_argument('--num-steps', type=int, default=80000,
+parser.add_argument('--num-steps', type=int, default=625,
                     help='number of steps the agent takes before updating')
 parser.add_argument('--max-steps', type=int, default=int(1e8),
                     help='maximum number of training steps in total')
@@ -107,11 +107,24 @@ def experiment(args):
 
 
         for _ in range(args.num_steps):
+            # numvar = 0
+            # for obj in gc.get_objects():
+            #     list_var = []
+            #     try:
+            #         if torch.is_tensor(obj) or (hasattr(obj,'data') and torch.is_tensor(obj.data)):
+            #             if obj.device.type == 'cuda':
+            #                 numvar+=1
+            #                 list_var.append(obj)
+            #
+            #     except:
+            #         pass
+            # print('num_var_:', numvar)
             action_dist, goals_5, states_total, value_5, goals_4, value_4, goals_3, value_3, goals_2, value_2, value_1, hierarchies_selected, train_eps \
                 = HONETS(x, goals_5, states_total, goals_4, goals_3, goals_2, masks[-1], step, train_eps)
+            hierarchies_selected = hierarchies_selected.to('cpu')
 
             # Take a step, log the info, get the next state
-            action, logp, entropy = take_action(action_dist)
+            action, logp, entropy = take_action(action_dist.to(args.device))
             x, reward, done, info = envs.step(action)
 
             logger.log_episode(info, step)
@@ -119,26 +132,25 @@ def experiment(args):
             mask = torch.FloatTensor(1 - done).unsqueeze(-1).to(args.device)
             masks.pop(0)
             masks.append(mask)
+            reward_tensor = torch.FloatTensor(reward).unsqueeze(-1).to('cpu')
+            Intrinsic_reward_tensor = HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu')
 
-            reward_tensor = torch.FloatTensor(reward).unsqueeze(-1).to(device)
-            Intrinsic_reward_tensor = HONETS.intrinsic_reward(states_total, goals_2, masks)
-
-            add_ = {'r': torch.FloatTensor(reward).unsqueeze(-1).to(device),
-                'r_i': HONETS.intrinsic_reward(states_total, goals_2, masks),
-                'logp': logp.unsqueeze(-1),
-                'entropy': entropy.unsqueeze(-1),
-                'hierarchy_selected': hierarchies_selected,
-                'hierarchy_drop_reward': HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected),
-                'm': mask,
-                'v_5': value_5,
-                'v_4': value_4,
-                'v_3': value_3,
-                'v_2': value_2,
-                'v_1': value_1,
-                'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goals_5, masks, 5),
-                'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goals_4, masks, 4),
-                'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goals_3, masks, 3),
-                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2)}
+            add_ = {'r': torch.FloatTensor(reward).unsqueeze(-1).to('cpu'),
+                'r_i': HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu'),
+                'logp': logp.unsqueeze(-1).to('cpu'),
+                'entropy': entropy.unsqueeze(-1).to('cpu'),
+                'hierarchy_selected': hierarchies_selected.to('cpu'),
+                'hierarchy_drop_reward': HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected).to('cpu'),
+                'm': mask.to('cpu'),
+                'v_5': value_5.to('cpu'),
+                'v_4': value_4.to('cpu'),
+                'v_3': value_3.to('cpu'),
+                'v_2': value_2.to('cpu'),
+                'v_1': value_1.to('cpu'),
+                'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goals_5, masks, 5).to('cpu'),
+                'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goals_4, masks, 4).to('cpu'),
+                'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goals_3, masks, 3).to('cpu'),
+                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2).to('cpu')}
 
             for _i in range(len(done)):
                 if done[_i]:
