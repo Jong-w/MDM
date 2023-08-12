@@ -7,7 +7,7 @@ from preprocess import Preprocessor
 from dilated_lstm import DilatedLSTM
 import numpy as np
 import random
-
+import gc
 class HONET(nn.Module):
     def __init__(self,
                  num_workers,
@@ -423,6 +423,20 @@ class Hierarchy2_back(nn.Module):
 
         return cosine_dist
 
+class critic_1(nn.Module):
+    def __init__(self, hidden_dim_1, num_actions):
+        self.hidden_dim_1 = hidden_dim_1
+        self.num_actions = num_actions
+        super().__init__()
+        self.fc1 = nn.Linear(self.hidden_dim_1 * self.num_actions, 50)
+        self.relu = nn.ReLU()
+        self.out = nn.Linear(50, 1)
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        return self.out(x).to('cpu')
+
+
 class Hierarchy1(nn.Module):
     def __init__(self, num_workers, time_horizon, hiddne_dim_5, hidden_dim_2, hidden_dim_1, num_actions, device):
         super().__init__()
@@ -436,27 +450,20 @@ class Hierarchy1(nn.Module):
         self.Wrnn = nn.LSTMCell(self.hidden_dim_2, self.hidden_dim_1 * self.num_actions)
         self.phi = nn.Linear(self.hidden_dim_2, hidden_dim_1, bias=False)
 
-        self.critic = nn.Sequential(
-            nn.Linear(self.hidden_dim_1 * self.num_actions, 50),
-            nn.ReLU(),
-            nn.Linear(50, 1)
-        )
+        # self.critic = nn.Sequential(
+        #     nn.Linear(self.hidden_dim_1 * self.num_actions, 50),
+        #     nn.ReLU(),
+        #     nn.Linear(50, 1)
+        # )
+        self.critic = critic_1(self.hidden_dim_1, self.num_actions)
 
     def forward(self, z, goals, hidden, mask):
 
-        hidden = (mask * hidden[0], mask * hidden[1])
+        hidden = (mask * hidden[0].to(self.device), mask * hidden[1].to(self.device))
         u, cx = self.Wrnn(z, hidden)
-        hidden = (u, cx)
-
+        del hidden
         # Detaching is vital, no end to end training
-        goals = torch.stack(goals).detach().sum(dim=0)
-        w = self.phi(goals)
-        value_est = self.critic(u)
-
-        u = u.reshape(u.shape[0], self.hidden_dim_1, self.num_actions)
-        a = torch.einsum("bk, bka -> ba", w, u).softmax(dim=-1)
-
-        return a, hidden, value_est
+        return torch.einsum("bk, bka -> ba", self.phi(torch.stack(goals).detach().sum(dim=0)), u.reshape(u.shape[0], self.hidden_dim_1, self.num_actions)).softmax(dim=-1).to('cpu'), (u.to('cpu'), cx.to('cpu')),  self.critic(u)
 
     def intrinsic_reward(self, states_s, goals_s, masks):
 
@@ -484,11 +491,11 @@ def mp_loss(storage, next_v_5, next_v_4, next_v_3, next_v_2, next_v_1, args):
 
     storage.placeholder()  # Fill ret_m, ret_w with empty vals
     for i in reversed(range(args.num_steps)):
-        ret_5 = storage.r[i] + args.gamma_5 * ret_5 * storage.m[i]
-        ret_4 = storage.r[i] + args.gamma_4 * ret_4 * storage.m[i]
-        ret_3 = storage.r[i] + args.gamma_3 * ret_3 * storage.m[i]
-        ret_2 = storage.r[i] + args.gamma_2 * ret_2 * storage.m[i]
-        ret_1 = storage.r[i] + args.gamma_1 * ret_1 * storage.m[i]
+        ret_5 = storage.r[i].to(args.device) + args.gamma_5 * ret_5 * storage.m[i].to(args.device)
+        ret_4 = storage.r[i].to(args.device) + args.gamma_4 * ret_4 * storage.m[i].to(args.device)
+        ret_3 = storage.r[i].to(args.device) + args.gamma_3 * ret_3 * storage.m[i].to(args.device)
+        ret_2 = storage.r[i].to(args.device) + args.gamma_2 * ret_2 * storage.m[i].to(args.device)
+        ret_1 = storage.r[i].to(args.device) + args.gamma_1 * ret_1.to(args.device) * storage.m[i].to(args.device)
         storage.ret_5[i] = ret_5
         storage.ret_4[i] = ret_4
         storage.ret_3[i] = ret_3
@@ -502,6 +509,14 @@ def mp_loss(storage, next_v_5, next_v_4, next_v_3, next_v_2, next_v_1, args):
         state_goal_5_cosines, state_goal_4_cosines, state_goal_3_cosines, state_goal_2_cosines, hierarchy_selected, hierarchy_drop_reward = storage.stack(
         ['r_i', 'v_5', 'v_4', 'v_3', 'v_2', 'v_1', 'ret_5', 'ret_4', 'ret_3', 'ret_2', 'ret_1',
          'logp', 'entropy', 'state_goal_5_cos', 'state_goal_4_cos', 'state_goal_3_cos', 'state_goal_2_cos', 'hierarchy_selected', 'hierarchy_drop_reward'])
+
+
+    rewards_intrinsic, value_5, value_4, value_3, value_2, value_1, ret_5, ret_4, ret_3, ret_2, ret_1, logps, entropy, \
+        state_goal_5_cosines, state_goal_4_cosines, state_goal_3_cosines, state_goal_2_cosines, hierarchy_selected, hierarchy_drop_reward = \
+    rewards_intrinsic.to(args.device), value_5.to(args.device), value_4.to(args.device), value_3.to(args.device), value_2.to(args.device), value_1.to(args.device), ret_5.to(args.device), \
+        ret_4.to(args.device), ret_3.to(args.device), ret_2.to(args.device), ret_1.to(args.device), logps.to(args.device), entropy.to(args.device), \
+        state_goal_5_cosines.to(args.device), state_goal_4_cosines.to(args.device), state_goal_3_cosines.to(args.device), state_goal_2_cosines.to(args.device), hierarchy_selected.to(args.device), hierarchy_drop_reward.to(args.device)
+
 
     advantage_5 = ret_5 - value_5
     loss_5 = (state_goal_5_cosines * advantage_5.detach()).mean()
