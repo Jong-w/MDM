@@ -15,7 +15,7 @@ parser.add_argument('--lr', type=float, default=0.0005,
                     help='learning rate')
 parser.add_argument('--env-name', type=str, default='FrostbiteNoFrameskip-v4',
                     help='gym environment name')
-parser.add_argument('--num-workers', type=int, default=32,
+parser.add_argument('--num-workers', type=int, default=128,
                     help='number of parallel environments to run')
 parser.add_argument('--num-steps', type=int, default=625,
                     help='number of steps the agent takes before updating')
@@ -55,7 +55,7 @@ parser.add_argument('--run-name', type=str, default='MDM_lambdaim_hm',
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
 
-parser.add_argument('--lambda-policy-im', type=float, default=0.1 )
+parser.add_argument('--lambda-policy-im', type=float, default=1)
 parser.add_argument('--hierarchy-eps',type=float, default=1e-10)
 
 args = parser.parse_args()
