@@ -136,6 +136,11 @@ def experiment(args):
             reward_tensor = torch.FloatTensor(reward).unsqueeze(-1).to('cpu')
             Intrinsic_reward_tensor = HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu')
 
+            state_goal_5_cos = HONETS.state_goal_cosine(states_total, goals_5, masks, 5).to('cpu')
+            state_goal_4_cos = HONETS.state_goal_cosine(states_total, goals_4, masks, 4).to('cpu')
+            state_goal_3_cos = HONETS.state_goal_cosine(states_total, goals_3, masks, 3).to('cpu')
+            state_goal_2_cos = HONETS.state_goal_cosine(states_total, goals_2, masks, 2).to('cpu')
+
             add_ = {'r': torch.FloatTensor(reward).unsqueeze(-1).to('cpu'),
                 'r_i': HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu'),
                 'logp': logp.unsqueeze(-1).to('cpu'),
@@ -148,10 +153,10 @@ def experiment(args):
                 'v_3': value_3.to('cpu'),
                 'v_2': value_2.to('cpu'),
                 'v_1': value_1.to('cpu'),
-                'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goals_5, masks, 5).to('cpu'),
-                'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goals_4, masks, 4).to('cpu'),
-                'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goals_3, masks, 3).to('cpu'),
-                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2).to('cpu')}
+                'state_goal_5_cos' : state_goal_5_cos,
+                'state_goal_4_cos' : state_goal_4_cos,
+                'state_goal_3_cos': state_goal_3_cos,
+                'state_goal_2_cos': state_goal_2_cos}
 
             for _i in range(len(done)):
                 if done[_i]:
