@@ -55,7 +55,7 @@ parser.add_argument('--run-name', type=str, default='MDM_lambdaim_hm',
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
 
-parser.add_argument('--lambda-policy-im', type=float, default=0.1)
+parser.add_argument('--lambda-policy-im', type=float, default=0.1 )
 parser.add_argument('--hierarchy-eps',type=float, default=1e-10)
 
 args = parser.parse_args()
