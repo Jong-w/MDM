@@ -6,6 +6,7 @@ import wandb
 
 import argparse
 import torch
+
 import gc
 parser = argparse.ArgumentParser(description='Honet')
 # GENERIC RL/MODEL PARAMETERS
@@ -55,7 +56,7 @@ parser.add_argument('--run-name', type=str, default='MDM',
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
 
-parser.add_argument('--hierarchy-eps',type=float, default=1e-10)
+parser.add_argument('--hierarchy-eps',type=float, default=5e-2)
 
 args = parser.parse_args()
 
@@ -124,6 +125,7 @@ def experiment(args):
             hierarchies_selected = hierarchies_selected.to('cpu')
 
             # Take a step, log the info, get the next state
+            action, logp, entropy = take_action(action_dist)
             action, logp, entropy = take_action(action_dist.to(args.device))
             x, reward, done, info = envs.step(action)
 
@@ -135,6 +137,25 @@ def experiment(args):
             reward_tensor = torch.FloatTensor(reward).unsqueeze(-1).to('cpu')
             Intrinsic_reward_tensor = HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu')
 
+            reward_tensor = torch.FloatTensor(reward).unsqueeze(-1).to(device)
+            Intrinsic_reward_tensor = HONETS.intrinsic_reward(states_total, goals_2, masks)
+
+            add_ = {'r': torch.FloatTensor(reward).unsqueeze(-1).to(device),
+                'r_i': HONETS.intrinsic_reward(states_total, goals_2, masks),
+                'logp': logp.unsqueeze(-1),
+                'entropy': entropy.unsqueeze(-1),
+                'hierarchy_selected': hierarchies_selected,
+                'hierarchy_drop_reward': HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected),
+                'm': mask,
+                'v_5': value_5,
+                'v_4': value_4,
+                'v_3': value_3,
+                'v_2': value_2,
+                'v_1': value_1,
+                'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goals_5, masks, 5),
+                'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goals_4, masks, 4),
+                'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goals_3, masks, 3),
+                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2)}
             add_ = {'r': torch.FloatTensor(reward).unsqueeze(-1).to('cpu'),
                 'r_i': HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu'),
                 'logp': logp.unsqueeze(-1).to('cpu'),
@@ -204,3 +225,4 @@ def main(args):
 
 if __name__ == '__main__':
     main(args)
+
