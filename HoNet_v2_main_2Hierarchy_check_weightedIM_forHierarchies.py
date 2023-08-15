@@ -42,11 +42,11 @@ parser.add_argument('--gamma-1', type=float, default=0.99,
                     help="discount factor supervisor")
 parser.add_argument('--alpha', type=float, default=0.5,
                     help='Intrinsic reward coefficient in [0, 1]')
-parser.add_argument('--eps', type=float, default=float(1e-7),
+parser.add_argument('--eps', type=float, default=float(0.05),
                     help='Random Gausian goal for exploration')
 parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[16, 256, 256, 256, 256],
                     help='Hidden dim (d)')
-parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 15, 20, 25],
+parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 5, 10, 20, 40],
                     help=' horizon (c_s)')
 
 # EXPERIMENT RELATED PARAMS
