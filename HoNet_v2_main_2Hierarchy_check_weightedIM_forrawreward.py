@@ -6,7 +6,6 @@ import wandb
 
 import argparse
 import torch
-
 import gc
 parser = argparse.ArgumentParser(description='Honet')
 # GENERIC RL/MODEL PARAMETERS
@@ -16,7 +15,7 @@ parser.add_argument('--lr', type=float, default=0.0005,
                     help='learning rate')
 parser.add_argument('--env-name', type=str, default='FrostbiteNoFrameskip-v4',
                     help='gym environment name')
-parser.add_argument('--num-workers', type=int, default=32,
+parser.add_argument('--num-workers', type=int, default=64,
                     help='number of parallel environments to run')
 parser.add_argument('--num-steps', type=int, default=625,
                     help='number of steps the agent takes before updating')
@@ -45,18 +44,19 @@ parser.add_argument('--alpha', type=float, default=0.5,
                     help='Intrinsic reward coefficient in [0, 1]')
 parser.add_argument('--eps', type=float, default=float(1e-7),
                     help='Random Gausian goal for exploration')
-parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[32, 256, 256, 256, 256],
+parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[16, 256, 256, 256, 256],
                     help='Hidden dim (d)')
-parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 15, 20, 25], #[1,10,20,30,40,50]
+parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 15, 20, 25],
                     help=' horizon (c_s)')
 
 # EXPERIMENT RELATED PARAMS
-parser.add_argument('--run-name', type=str, default='MDM',
+parser.add_argument('--run-name', type=str, default='MDM_remove_rawr',
                     help='run name for the logger.')
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
 
-parser.add_argument('--hierarchy-eps',type=float, default=5e-2)
+parser.add_argument('--lambda-rawr', type=float, default=0.1)
+parser.add_argument('--hierarchy-eps',type=float, default=1e-10)
 
 args = parser.parse_args()
 
@@ -125,7 +125,6 @@ def experiment(args):
             hierarchies_selected = hierarchies_selected.to('cpu')
 
             # Take a step, log the info, get the next state
-            action, logp, entropy = take_action(action_dist)
             action, logp, entropy = take_action(action_dist.to(args.device))
             x, reward, done, info = envs.step(action)
 
@@ -137,41 +136,28 @@ def experiment(args):
             reward_tensor = torch.FloatTensor(reward).unsqueeze(-1).to('cpu')
             Intrinsic_reward_tensor = HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu')
 
-            reward_tensor = torch.FloatTensor(reward).unsqueeze(-1).to(device)
-            Intrinsic_reward_tensor = HONETS.intrinsic_reward(states_total, goals_2, masks)
-
-            add_ = {'r': torch.FloatTensor(reward).unsqueeze(-1).to(device),
-                'r_i': HONETS.intrinsic_reward(states_total, goals_2, masks),
-                'logp': logp.unsqueeze(-1),
-                'entropy': entropy.unsqueeze(-1),
-                'hierarchy_selected': hierarchies_selected,
-                'hierarchy_drop_reward': HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected),
-                'm': mask,
-                'v_5': value_5,
-                'v_4': value_4,
-                'v_3': value_3,
-                'v_2': value_2,
-                'v_1': value_1,
-                'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goals_5, masks, 5),
-                'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goals_4, masks, 4),
-                'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goals_3, masks, 3),
-                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2)}
+            state_goal_5_cos = HONETS.state_goal_cosine(states_total, goals_5, masks, 5).to('cpu')
+            state_goal_4_cos = HONETS.state_goal_cosine(states_total, goals_4, masks, 4).to('cpu')
+            state_goal_3_cos = HONETS.state_goal_cosine(states_total, goals_3, masks, 3).to('cpu')
+            state_goal_2_cos = HONETS.state_goal_cosine(states_total, goals_2, masks, 2).to('cpu')
+            hierarchy_motivation = (torch.stack([state_goal_5_cos, state_goal_4_cos, state_goal_3_cos],
+                         axis=1).squeeze() * hierarchies_selected).mean(axis=1)
             add_ = {'r': torch.FloatTensor(reward).unsqueeze(-1).to('cpu'),
                 'r_i': HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu'),
                 'logp': logp.unsqueeze(-1).to('cpu'),
                 'entropy': entropy.unsqueeze(-1).to('cpu'),
                 'hierarchy_selected': hierarchies_selected.to('cpu'),
-                'hierarchy_drop_reward': HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected).to('cpu'),
+                'hierarchy_drop_reward':(HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected)*args.lambda_rawr + hierarchy_motivation).to('cpu'),
                 'm': mask.to('cpu'),
                 'v_5': value_5.to('cpu'),
                 'v_4': value_4.to('cpu'),
                 'v_3': value_3.to('cpu'),
                 'v_2': value_2.to('cpu'),
                 'v_1': value_1.to('cpu'),
-                'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goals_5, masks, 5).to('cpu'),
-                'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goals_4, masks, 4).to('cpu'),
-                'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goals_3, masks, 3).to('cpu'),
-                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2).to('cpu')}
+                'state_goal_5_cos' : state_goal_5_cos,
+                'state_goal_4_cos' : state_goal_4_cos,
+                'state_goal_3_cos': state_goal_3_cos,
+                'state_goal_2_cos': state_goal_2_cos}
 
             for _i in range(len(done)):
                 if done[_i]:
@@ -225,4 +211,3 @@ def main(args):
 
 if __name__ == '__main__':
     main(args)
-
