@@ -17,7 +17,7 @@ parser.add_argument('--env-name', type=str, default='FrostbiteNoFrameskip-v4',
                     help='gym environment name')
 parser.add_argument('--num-workers', type=int, default=32,
                     help='number of parallel environments to run')
-parser.add_argument('--num-steps', type=int, default=625,
+parser.add_argument('--num-steps', type=int, default=400,
                     help='number of steps the agent takes before updating')
 parser.add_argument('--max-steps', type=int, default=int(1e8),
                     help='maximum number of training steps in total')
@@ -199,7 +199,7 @@ def experiment(args):
 def main(args):
     run_name = args.run_name
     for seed in range(1):
-        wandb.init(project="MDM_DK",
+        wandb.init(project="MDM_new",
                    config=args.__dict__
                    )
         args.seed = seed
