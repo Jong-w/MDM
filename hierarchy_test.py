@@ -1,5 +1,5 @@
 from logger import Logger
-from HoNet_v2_2Hierarchy_check import HONET, mp_loss
+from MDM import HONET, mp_loss
 from utils import make_envs, take_action, init_obj
 from storage import Storage
 import wandb

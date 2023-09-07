@@ -1,5 +1,5 @@
 from logger import Logger
-from HoNet_v2_2Hierarchy_check import HONET, mp_loss
+from MDM import HONET, mp_loss
 from utils import make_envs, take_action, init_obj
 from storage import Storage
 import wandb
@@ -146,7 +146,7 @@ def experiment(args):
                 'logp': logp.unsqueeze(-1).to('cpu'),
                 'entropy': entropy.unsqueeze(-1).to('cpu'),
                 'hierarchy_selected': hierarchies_selected.to('cpu'),
-                'hierarchy_drop_reward':(HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected)* args.lambda_policy_im).to('cpu'),
+                'hierarchy_drop_reward':(HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected) * args.lambda_policy_im).to('cpu'),
                 'm': mask.to('cpu'),
                 'v_5': value_5.to('cpu'),
                 'v_4': value_4.to('cpu'),

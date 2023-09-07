@@ -105,7 +105,8 @@ class HONET(nn.Module):
                 self.hierarchies_selected[:, 0] = random.randrange(0,2)
                 self.hierarchies_selected[:, 1] = random.randrange(0,2)
                 self.hierarchies_selected[:, 2] = random.randrange(0,2)
-            train_eps = train_eps * 0.99
+            if train_eps > 1e-10:
+                train_eps = train_eps * 0.99
 
         goal_5 = self.Hierarchy5_back(goal_5_norm, self.goal_0, self.hierarchies_selected[:, 0])
         goal_4 = self.Hierarchy4_back(goal_4_norm, goal_5, self.hierarchies_selected[:, 1])

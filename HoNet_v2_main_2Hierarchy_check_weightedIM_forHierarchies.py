@@ -1,5 +1,5 @@
 from logger import Logger
-from HoNet_v2_2Hierarchy_check import HONET, mp_loss
+from MDM import HONET, mp_loss
 from utils import make_envs, take_action, init_obj
 from storage import Storage
 import wandb
@@ -7,7 +7,15 @@ import wandb
 import argparse
 import torch
 import gc
+
 parser = argparse.ArgumentParser(description='Honet')
+
+# EXPERIMENT RELATED PARAMS
+parser.add_argument('--run-name', type=str, default='MDM_lambdaim_1',
+                    help='run name for the logger.')
+parser.add_argument('--seed', type=int, default=0,
+                    help='reproducibility seed.')
+
 # GENERIC RL/MODEL PARAMETERS
 parser.add_argument('--dynamic', type=int, default=0,
                     help='dynamic_neural_network or not')
@@ -42,21 +50,15 @@ parser.add_argument('--gamma-1', type=float, default=0.99,
                     help="discount factor supervisor")
 parser.add_argument('--alpha', type=float, default=0.5,
                     help='Intrinsic reward coefficient in [0, 1]')
-parser.add_argument('--eps', type=float, default=float(0.05),
+parser.add_argument('--eps', type=float, default=float(1e-7),
                     help='Random Gausian goal for exploration')
 parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[16, 256, 256, 256, 256],
                     help='Hidden dim (d)')
-parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 5, 10, 15, 20],
+parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 15, 20, 25],
                     help=' horizon (c_s)')
 
-# EXPERIMENT RELATED PARAMS
-parser.add_argument('--run-name', type=str, default='MDM_lambdaim_hm',
-                    help='run name for the logger.')
-parser.add_argument('--seed', type=int, default=0,
-                    help='reproducibility seed.')
-
 parser.add_argument('--lambda-policy-im', type=float, default=1)
-parser.add_argument('--hierarchy-eps',type=float, default=1e-10)
+parser.add_argument('--hierarchy-eps',type=float, default=5e-1)
 
 args = parser.parse_args()
 
@@ -200,7 +202,7 @@ def experiment(args):
 def main(args):
     run_name = args.run_name
     for seed in range(1):
-        wandb.init(project="MDM_new",
+        wandb.init(project="MDM_DK_testing",
                    config=args.__dict__
                    )
         args.seed = seed
