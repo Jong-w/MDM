@@ -1,5 +1,5 @@
 from logger import Logger
-from MDM import HONET, mp_loss
+from MDM_ucb import HONET, mp_loss
 from utils import make_envs, take_action, init_obj
 from storage import Storage
 import wandb
@@ -11,7 +11,7 @@ import gc
 parser = argparse.ArgumentParser(description='Honet')
 
 # EXPERIMENT RELATED PARAMS
-parser.add_argument('--run-name', type=str, default='MDM_lambdaim_0.05',
+parser.add_argument('--run-name', type=str, default='MDM_ucb_lambdaim_0.1',
                     help='run name for the logger.')
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
@@ -57,7 +57,7 @@ parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[16, 256, 256,
 parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 15, 20, 25],
                     help=' horizon (c_s)')
 
-parser.add_argument('--lambda-policy-im', type=float, default=0.05)
+parser.add_argument('--lambda-policy-im', type=float, default=0.1)
 parser.add_argument('--hierarchy-eps',type=float, default=5e-1)
 
 args = parser.parse_args()
