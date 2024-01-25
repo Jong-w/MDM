@@ -1,5 +1,5 @@
 from logger import Logger
-from MDM import HONET, mp_loss
+from MDM import MDM, mp_loss
 from utils import make_envs, take_action, init_obj
 from storage import Storage
 import wandb
@@ -7,10 +7,11 @@ import wandb
 import argparse
 import torch
 import gc
-parser = argparse.ArgumentParser(description='Honet')
+
+parser = argparse.ArgumentParser(description='MDM')
 
 # EXPERIMENT RELATED PARAMS
-parser.add_argument('--run-name', type=str, default='MDM_high_hierarchy_eps(100)_600steps',
+parser.add_argument('--run-name', type=str, default='MDM',
                     help='run name for the logger.')
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
@@ -55,7 +56,9 @@ parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[16, 256, 256,
                     help='Hidden dim (d)')
 parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 15, 20, 25],
                     help=' horizon (c_s)')
-parser.add_argument('--hierarchy-eps',type=float, default=10e-1)
+
+parser.add_argument('--lambda-policy-im', type=float, default=0.1)
+parser.add_argument('--hierarchy-eps',type=float, default=1e-10)
 
 args = parser.parse_args()
 
@@ -73,7 +76,7 @@ def experiment(args):
         torch.backends.cudnn.benchmark = False
 
     envs = make_envs(args.env_name, args.num_workers)
-    HONETS = HONET(
+    MDMS = MDM(
         num_workers=args.num_workers,
         input_dim=envs.observation_space.shape,
         hidden_dim_Hierarchies = args.hidden_dim_Hierarchies,
@@ -84,16 +87,16 @@ def experiment(args):
         args=args)
 
     # In orther to avoid gradient exploding, we apply gradient clipping.
-    optimizer = torch.optim.RMSprop(HONETS.parameters(), lr=args.lr, alpha=0.99, eps=1e-5)
+    optimizer = torch.optim.RMSprop(MDMS.parameters(), lr=args.lr, alpha=0.99, eps=1e-5)
 
-    goals_5, states_total, goals_4, goals_3, goals_2, masks = HONETS.init_obj()
+    goals_5, states_total, goals_4, goals_3, goals_2, masks = MDMS.init_obj()
 
     x = envs.reset()
     step = 0
     train_eps = float(args.hierarchy_eps)
     while step < args.max_steps:
         # Detaching LSTMs and goals_m
-        HONETS.repackage_hidden()
+        MDMS.repackage_hidden()
         goals_5 = [g.detach() for g in goals_5]
         goals_4 = [g.detach() for g in goals_4]
         goals_3 = [g.detach() for g in goals_3]
@@ -107,20 +110,9 @@ def experiment(args):
 
 
         for _ in range(args.num_steps):
-            # numvar = 0
-            # for obj in gc.get_objects():
-            #     list_var = []
-            #     try:
-            #         if torch.is_tensor(obj) or (hasattr(obj,'data') and torch.is_tensor(obj.data)):
-            #             if obj.device.type == 'cuda':
-            #                 numvar+=1
-            #                 list_var.append(obj)
-            #
-            #     except:
-            #         pass
-            # print('num_var_:', numvar)
+
             action_dist, goals_5, states_total, value_5, goals_4, value_4, goals_3, value_3, goals_2, value_2, value_1, hierarchies_selected, train_eps \
-                = HONETS(x, goals_5, states_total, goals_4, goals_3, goals_2, masks[-1], step, train_eps)
+                = MDMS(x, goals_5, states_total, goals_4, goals_3, goals_2, masks[-1], step, train_eps)
             hierarchies_selected = hierarchies_selected.to('cpu')
 
             # Take a step, log the info, get the next state
@@ -133,24 +125,29 @@ def experiment(args):
             masks.pop(0)
             masks.append(mask)
             reward_tensor = torch.FloatTensor(reward).unsqueeze(-1).to('cpu')
-            Intrinsic_reward_tensor = HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu')
+            Intrinsic_reward_tensor = MDMS.intrinsic_reward(states_total, goals_2, masks).to('cpu')
+
+            state_goal_5_cos = MDMS.state_goal_cosine(states_total, goals_5, masks, 5).to('cpu')
+            state_goal_4_cos = MDMS.state_goal_cosine(states_total, goals_4, masks, 4).to('cpu')
+            state_goal_3_cos = MDMS.state_goal_cosine(states_total, goals_3, masks, 3).to('cpu')
+            state_goal_2_cos = MDMS.state_goal_cosine(states_total, goals_2, masks, 2).to('cpu')
 
             add_ = {'r': torch.FloatTensor(reward).unsqueeze(-1).to('cpu'),
-                'r_i': HONETS.intrinsic_reward(states_total, goals_2, masks).to('cpu'),
+                'r_i': MDMS.intrinsic_reward(states_total, goals_2, masks).to('cpu'),
                 'logp': logp.unsqueeze(-1).to('cpu'),
                 'entropy': entropy.unsqueeze(-1).to('cpu'),
                 'hierarchy_selected': hierarchies_selected.to('cpu'),
-                'hierarchy_drop_reward': HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected).to('cpu'),
+                'hierarchy_drop_reward':(MDMS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected) * args.lambda_policy_im).to('cpu'),
                 'm': mask.to('cpu'),
                 'v_5': value_5.to('cpu'),
                 'v_4': value_4.to('cpu'),
                 'v_3': value_3.to('cpu'),
                 'v_2': value_2.to('cpu'),
                 'v_1': value_1.to('cpu'),
-                'state_goal_5_cos' : HONETS.state_goal_cosine(states_total, goals_5, masks, 5).to('cpu'),
-                'state_goal_4_cos' : HONETS.state_goal_cosine(states_total, goals_4, masks, 4).to('cpu'),
-                'state_goal_3_cos': HONETS.state_goal_cosine(states_total, goals_3, masks, 3).to('cpu'),
-                'state_goal_2_cos': HONETS.state_goal_cosine(states_total, goals_2, masks, 2).to('cpu')}
+                'state_goal_5_cos' : state_goal_5_cos,
+                'state_goal_4_cos' : state_goal_4_cos,
+                'state_goal_3_cos': state_goal_3_cos,
+                'state_goal_2_cos': state_goal_2_cos}
 
             for _i in range(len(done)):
                 if done[_i]:
@@ -164,7 +161,7 @@ def experiment(args):
             step += args.num_workers
 
         with torch.no_grad():
-            _, _, _, next_v_5, _, next_v_4, _, next_v_3, _, next_v_2, next_v_1, _, _ = HONETS(x, goals_5, states_total, goals_4, goals_3, goals_2, masks[-1], step, train_eps=0, save = False)
+            _, _, _, next_v_5, _, next_v_4, _, next_v_3, _, next_v_2, next_v_1, _, _ = MDMS(x, goals_5, states_total, goals_4, goals_3, goals_2, masks[-1], step, train_eps=0, save = False)
 
 
             next_v_5 = next_v_5.detach()
@@ -177,15 +174,15 @@ def experiment(args):
         loss, loss_dict = mp_loss(storage, next_v_5, next_v_4, next_v_3, next_v_2, next_v_1, args)
         wandb.log(loss_dict)
         loss.backward()
-        torch.nn.utils.clip_grad_value_(HONETS.parameters(), clip_value=args.grad_clip)
+        torch.nn.utils.clip_grad_value_(MDMS.parameters(), clip_value=args.grad_clip)
         optimizer.step()
         logger.log_scalars(loss_dict, step)
 
     envs.close()
     torch.save({
-        'model': HONETS.state_dict(),
+        'model': MDMS.state_dict(),
         'args': args,
-        'processor_mean': HONETS.preprocessor.rms.mean,
+        'processor_mean': MDMS.preprocessor.rms.mean,
         'optim': optimizer.state_dict()},
         f'models/{args.env_name}_{args.run_name}_steps={step}.pt')
 

@@ -8,7 +8,7 @@ from dilated_lstm import DilatedLSTM
 import numpy as np
 import random
 import gc
-class HONET(nn.Module):
+class MDM(nn.Module):
     def __init__(self,
                  num_workers,
                  input_dim,
