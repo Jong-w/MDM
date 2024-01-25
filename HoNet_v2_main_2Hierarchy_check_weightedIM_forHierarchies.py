@@ -11,7 +11,7 @@ import gc
 parser = argparse.ArgumentParser(description='Honet')
 
 # EXPERIMENT RELATED PARAMS
-parser.add_argument('--run-name', type=str, default='MDM_lambdaim_0.15',
+parser.add_argument('--run-name', type=str, default='MDM_lambdaim_0.1',
                     help='run name for the logger.')
 parser.add_argument('--seed', type=int, default=0,
                     help='reproducibility seed.')
@@ -57,8 +57,8 @@ parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[16, 256, 256,
 parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 15, 20, 25],
                     help=' horizon (c_s)')
 
-parser.add_argument('--lambda-policy-im', type=float, default=0.15)
-parser.add_argument('--hierarchy-eps',type=float, default=5e-1)
+parser.add_argument('--lambda-policy-im', type=float, default=0.1)
+parser.add_argument('--hierarchy-eps',type=float, default=1e-10)
 
 args = parser.parse_args()
 
@@ -149,7 +149,7 @@ def experiment(args):
                 'logp': logp.unsqueeze(-1).to('cpu'),
                 'entropy': entropy.unsqueeze(-1).to('cpu'),
                 'hierarchy_selected': hierarchies_selected.to('cpu'),
-                'hierarchy_drop_reward':(HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected) + hierarchy_motivation*args.lambda_policy_im).to('cpu'),
+                'hierarchy_drop_reward':(HONETS.hierarchy_drop_reward(reward_tensor + Intrinsic_reward_tensor, hierarchies_selected) * args.lambda_policy_im).to('cpu'),
                 'm': mask.to('cpu'),
                 'v_5': value_5.to('cpu'),
                 'v_4': value_4.to('cpu'),
