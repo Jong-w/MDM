@@ -338,6 +338,10 @@ def main(args):
     all_envs = gym.envs.registry.all()
     noframeskip_v4_no_ram_envs = [env.id for env in all_envs if
                                   ((env.id.endswith('NoFrameskip-v4')) and ('-ram' not in env.id) and ('Defender' not in env.id))]
+    
+    # make noframeskip_v4_no_ram_envs in reverse order
+    noframeskip_v4_no_ram_envs = noframeskip_v4_no_ram_envs[::-1]
+
 
     run_name = args.run_name
 

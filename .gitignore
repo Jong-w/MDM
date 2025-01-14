@@ -3567,3 +3567,5 @@ x_true_39.png
 100k_challenge/old/models_new_testing_/ZaxxonNoFrameskip-v4_MDM_no_hd_25_steps=102400.pt
 100k_challenge/old/models_new_testing_/ZaxxonNoFrameskip-v4_MDM_no_hd_80_steps=102400.pt
 mlp_deconv.pt
+gen_goal
+__pycache__/logger.cpython-39.pyc

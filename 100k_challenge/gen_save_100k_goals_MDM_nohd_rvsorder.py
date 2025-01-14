@@ -19,15 +19,22 @@ import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description='MDM')
 
-parser = argparse.ArgumentParser(description='Feudal Nets')
+# EXPERIMENT RELATED PARAMS
+parser.add_argument('--run-name', type=str, default='',
+                    help='run name for the logger.')
+parser.add_argument('--seed', type=int, default=0,
+                    help='reproducibility seed.')
+
 # GENERIC RL/MODEL PARAMETERS
+parser.add_argument('--dynamic', type=int, default=0,
+                    help='dynamic_neural_network or not')
 parser.add_argument('--lr', type=float, default=0.0005,
                     help='learning rate')
-parser.add_argument('--env-name', type=str, default='FrostbiteNoFrameskip-v4',
+parser.add_argument('--env-name', type=str, default='SolarisNoFrameskip-v4',
                     help='gym environment name')
-parser.add_argument('--num-workers', type=int, default=1,
+parser.add_argument('--num-workers', type=int, default=32,
                     help='number of parallel environments to run')
-parser.add_argument('--num-steps', type=int, default=400,
+parser.add_argument('--num-steps', type=int, default=1000,
                     help='number of steps the agent takes before updating')
 parser.add_argument('--max-steps', type=int, default=int(1e5),
                     help='maximum number of training steps in total')
@@ -40,29 +47,29 @@ parser.add_argument('--entropy-coef', type=float, default=0.01,
 parser.add_argument('--mlp', type=int, default=0,
                     help='toggle to feedforward ML architecture')
 
+
 # SPECIFIC FEUDALNET PARAMETERS
-parser.add_argument('--time-horizon', type=int, default=10,
-                    help='Manager horizon (c)')
-parser.add_argument('--hidden-dim-manager', type=int, default=256,
-                    help='Hidden dim (d)')
-parser.add_argument('--hidden-dim-worker', type=int, default=16,
-                    help='Hidden dim for worker (k)')
-parser.add_argument('--gamma-w', type=float, default=0.95,
+parser.add_argument('--gamma-5', type=float, default=0.999,
                     help="discount factor worker")
-parser.add_argument('--gamma-m', type=float, default=0.99,
+parser.add_argument('--gamma-4', type=float, default=0.999,
+                    help="discount factor supervisor")
+parser.add_argument('--gamma-3', type=float, default=0.999,
                     help="discount factor manager")
+parser.add_argument('--gamma-2', type=float, default=0.999,
+                    help="discount factor worker")
+parser.add_argument('--gamma-1', type=float, default=0.99,
+                    help="discount factor supervisor")
 parser.add_argument('--alpha', type=float, default=0.5,
                     help='Intrinsic reward coefficient in [0, 1]')
-parser.add_argument('--eps', type=float, default=int(1e-5),
+parser.add_argument('--eps', type=float, default=float(1e-7),
                     help='Random Gausian goal for exploration')
-parser.add_argument('--dilation', type=int, default=10,
-                    help='Dilation parameter for manager LSTM.')
+parser.add_argument('--hidden-dim-Hierarchies', type=int, default=[16, 256, 256, 256, 256],
+                    help='Hidden dim (d)')
+parser.add_argument('--time_horizon_Hierarchies', type=int, default=[1, 10, 20, 40, 80], #[1, 10, 15, 20, 25],
+                    help=' horizon (c_s)')
 
-# EXPERIMENT RELATED PARAMS
-parser.add_argument('--run-name', type=str, default='',
-                    help='run name for the logger.')
-parser.add_argument('--seed', type=int, default=0,
-                    help='reproducibility seed.')
+parser.add_argument('--lambda-policy-im', type=float, default=0.1)
+parser.add_argument('--hierarchy-eps',type=float, default=1e-10)
 
 args = parser.parse_args()
 
@@ -160,12 +167,40 @@ def experiment(args):
             mlp=args.mlp,
             args=args)
 
+    if args.model_name == 'MDM_80':
+        model = MDM(
+            num_workers=args.num_workers,
+            input_dim=envs.observation_space.shape,
+            hidden_dim_Hierarchies = args.hidden_dim_Hierarchies,
+            time_horizon_Hierarchies=args.time_horizon_Hierarchies,
+            n_actions=envs.single_action_space.n,
+            dynamic=0,
+            device=device,
+            args=args)
+    if args.model_name == 'MDM_no_hd_80':
+        model = MDM_no_hd(
+            num_workers=args.num_workers,
+            input_dim=envs.observation_space.shape,
+            hidden_dim_Hierarchies=args.hidden_dim_Hierarchies,
+            time_horizon_Hierarchies=args.time_horizon_Hierarchies,
+            n_actions=envs.single_action_space.n,
+            dynamic=0,
+            device=device,
+            args=args)
+
+
     if args.model_name == 'FuN':
         path = '100k_challenge/models_new_testing_fun/' + args.env_name + "_" + args.model_name + "_steps=102400.pt"
         # path = 'models_new_testing_fun/' + args.env_name + "_" + args.model_name + "_steps=102400.pt"
     if args.model_name == 'a3c':
         path = '100k_challenge/models/' + args.env_name + "_" + args.model_name + "_steps=102400.pt"
         # path = 'models/' + args.env_name + "_" + args.model_name + "_steps=102400.pt"
+    if args.model_name == 'MDM_no_hd_80':
+        path = '100k_challenge/models_new_testing_/' + args.env_name + "_" + args.model_name + "_steps=102400.pt"
+        # path = 'models_new_testing_/' + args.env_name + "_" + args.model_name + "_steps=102400.pt"
+    if args.model_name == 'MDM_80':
+        path = '100k_challenge/models_new_testing/' + args.env_name + "_" + args.model_name + "_steps=102400.pt"
+        # path = 'models_new_testing/' + args.env_name + "_" + args.model_name + "_steps=102400.pt"
     model.load_state_dict(torch.load(path)['model'])
     model.eval()
 
@@ -181,46 +216,51 @@ def experiment(args):
     # In orther to avoid gradient exploding, we apply gradient clipping.
     #optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr, alpha=0.99, eps=1e-5)
 
-    goals, states, masks = model.init_obj()
-    
+    goals_5, states_total, goals_4, goals_3, goals_2, masks = model.init_obj()
+
     x = envs.reset()
     _x = env_flat.reset()
     step = 0
+    train_eps = float(args.hierarchy_eps)
     step_t_ep = 0
     break_flag = False
     while step < args.max_steps:
 
         # Detaching LSTMs and goals
         model.repackage_hidden()
-        goals = [g.detach() for g in goals]
-        storage = Storage(size=args.num_steps,
-                          keys=['r', 'r_i', 'v_w', 'v_m', 'logp', 'entropy',
-                                's_goal_cos', 'mask', 'ret_w', 'ret_m',
-                                'adv_m', 'adv_w'])
+        goals_5 = [g.detach() for g in goals_5]
+        goals_4 = [g.detach() for g in goals_4]
+        goals_3 = [g.detach() for g in goals_3]
+        goals_2 = [g.detach() for g in goals_2]
 
-        xs = [np.zeros_like(x)]*len(goals)
+        storage = Storage(size=args.num_steps,
+                          keys=['r_i', 'v_5', 'v_4', 'v_3', 'v_2', 'v_1', 'ret_5', 'ret_4', 'ret_3', 'ret_2', 'ret_1',
+                                'logp', 'entropy', 'state_goal_5_cos', 'state_goal_4_cos', 'state_goal_3_cos', 'state_goal_2_cos',
+                                'hierarchy_selected' 'mask'])
+
+        xs = [np.zeros_like(x)]*len(goals_2)
         xs.append(x)
         for _ in range(args.num_steps):
-            action_dist, goals, states, value_m, value_w \
-                = model(x, goals, states, masks[-1])
+
+            action_dist, goals_5, states_total, value_5, goals_4, value_4, goals_3, value_3, goals_2, value_2, value_1, hierarchies_selected, train_eps \
+                = model(x, goals_5, states_total, goals_4, goals_3, goals_2, masks[-1], step, train_eps)
+            hierarchies_selected = hierarchies_selected.to('cpu')
+
+            # dropping other workers
+
+            action_dist_ = action_dist[0]
+            states_total_ = [st[0].unsqueeze(0) for st in states_total]
+            goals_5_ = [g[0].unsqueeze(0) for g in goals_5]
+            goals_4_ = [g[0].unsqueeze(0) for g in goals_4]
+            goals_3_ = [g[0].unsqueeze(0) for g in goals_3]
+            goals_2_ = [g[0].unsqueeze(0) for g in goals_2]
+            # masks_ = [m[0].unsqueeze(0) for m in masks]
+            hierarchies_selected_ = hierarchies_selected[0].unsqueeze(0)
 
             # Take a step, log the info, get the next state
-            action, logp, entropy = take_action(action_dist)
+            action, logp, entropy = take_action(action_dist.to(args.device))
             x, reward, done, info = envs.step(action)
             _x, _reward, _done, _info = env_flat.step(action[0])
-
-            #            infos =[ ]
-            #           for i in range(len(done)):
-            #                # empty dict
-            #                info_temp = {}
-
-            #                for dict_name, dict_array in info.items():
-            # add dict_name and dict_array[i] to info_temp
-            #                    info_temp[dict_name] = dict_array[i]
-
-            #                infos.append(info_temp)
-
-            # logger.log_episode(info, step)
 
             mask = torch.FloatTensor(1 - done).unsqueeze(-1).to(args.device)
             masks.pop(0)
@@ -229,19 +269,32 @@ def experiment(args):
             xs.pop(0)
             xs.append(x)
 
-            packed = model.finding_goal_alike(x, states, goals, masks, xs, env_flat)
+            masks_ = [m[0].unsqueeze(0) for m in masks]
+            xs_ = [xss[:1] for xss in xs]
+
+            packed = model.finding_goal_alike(x[0].reshape(1,*x.shape[1:]), states_total_, goals_2_, goals_3_, \
+                                              goals_4_, goals_5_,  hierarchies_selected_, masks_, xs_, env_flat)
+            
 
             if packed is not None:
                 state_goal, losses, x_trues = packed
-                print(f"losses: {np.array(losses).min()}")
+
+                losses_np = np.array(losses)
+                # find where losses_np is nan
+                nan_idx = np.argwhere(np.isnan(losses_np))
+                losses_np_nanmin = np.nanmin(losses_np.reshape(4,-1), axis=1)
+
+                # print four losses
+                print(f"losses: {losses_np_nanmin}") 
+
                 #where isthe argmin(losses)
-                for iii in range(len(state_goal)):
+                for iii in range(len(state_goal[0])):
                     # train the model for generating goals
-                    _state_goal = state_goal[iii]
+                    _state_goal = state_goal[0][iii]
                     _x_true = x_trues[iii]
 
-                    _x_true_valid = _x_true[model.c:] # current states
-                    _x_true_in = _x_true[:-model.c] # states from model.c step before
+                    _x_true_valid = _x_true[model.time_horizon[1]:] # current states
+                    _x_true_in = _x_true[:-model.time_horizon[1]] # states from model.c step before
 
                     # MAKE evertthing to torch.tensor
                     _x_true_valid = [torch.tensor(xt).to(device) for xt in _x_true_valid]
@@ -250,7 +303,7 @@ def experiment(args):
                     _x_true_valid = torch.stack(_x_true_valid).squeeze().to(device)
                     _x_true_in = torch.stack(_x_true_in).squeeze().to(device)
 
-                    _state_goal_valid = _state_goal[:-model.c] # goals from model.c step before
+                    _state_goal_valid = _state_goal[:-model.time_horizon[1]] # goals from model.c step before
                     _goals_valid = [sg[0] for sg in _state_goal_valid] 
                     _goals_valid = torch.stack(_goals_valid).squeeze().to(device)
 
@@ -276,15 +329,16 @@ def experiment(args):
                 # save model but including the model name
                 torch.save(mlp_deconv.state_dict(), dirname + '/mlp_deconv_' + args.env_name + "_" + args.model_name + "_steps=102400.pt")
                 # make figures comparing x_true and x_pred
-                for iii in range(len(state_goal)):
+                for iii in range(len(state_goal[0])):
+                    # train the model for generating goals
+                    _state_goal = state_goal[0][iii]
                     print('iii:',iii)
                     os.makedirs(os.path.join(dirname, f'epoch_{iii}'), exist_ok=True)
 
-                    _state_goal = state_goal[iii]
                     _x_true = x_trues[iii]
 
-                    _x_true_valid = _x_true[model.c:]
-                    _x_true_in = _x_true[:-model.c]
+                    _x_true_valid = _x_true[model.time_horizon[1]:]
+                    _x_true_in = _x_true[:-model.time_horizon[1]]
 
                     _x_true_valid = [torch.tensor(xt).to(device) for xt in _x_true_valid]
                     _x_true_in = [torch.tensor(xt).to(device) for xt in _x_true_in]
@@ -292,7 +346,7 @@ def experiment(args):
                     _x_true_valid = torch.stack(_x_true_valid).squeeze().to(device)
                     _x_true_in = torch.stack(_x_true_in).squeeze().to(device)
 
-                    _state_goal_valid = _state_goal[:-model.c]
+                    _state_goal_valid = _state_goal[:-model.time_horizon[1]]
                     _goals_valid = [sg[0] for sg in _state_goal_valid]
 
                     _goals_valid = torch.stack(_goals_valid).squeeze().to(device)
@@ -338,7 +392,7 @@ def main(args):
     all_envs = gym.envs.registry.all()
     noframeskip_v4_no_ram_envs = [env.id for env in all_envs if
                                   ((env.id.endswith('NoFrameskip-v4')) and ('-ram' not in env.id) and ('Defender' not in env.id))]
-
+    noframeskip_v4_no_ram_envs = noframeskip_v4_no_ram_envs[::-1]
     run_name = args.run_name
 
     seeds_ = np.random.randint(-1000, 1000, 100)
@@ -347,7 +401,7 @@ def main(args):
     # existing_names = [run.name for run in runs]
 
     #for seed in range(len(noframeskip_v4_no_ram_envs)):
-    for i in ['FuN']:
+    for i in ['MDM_no_hd_80', 'MDM_80']:
         for seed in range(len(noframeskip_v4_no_ram_envs)):
             # check if dirname = 'gen_goal/' + args.model_name + "_" + args.env_name exists
             dirname = 'gen_goal/' + i + "_" + noframeskip_v4_no_ram_envs[seed]

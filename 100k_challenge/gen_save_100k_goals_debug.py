@@ -351,8 +351,8 @@ def main(args):
         for seed in range(len(noframeskip_v4_no_ram_envs)):
             # check if dirname = 'gen_goal/' + args.model_name + "_" + args.env_name exists
             dirname = 'gen_goal/' + i + "_" + noframeskip_v4_no_ram_envs[seed]
-            if os.path.exists(dirname):
-                continue
+            # if os.path.exists(dirname):
+            #     continue
 
             env_name_ = noframeskip_v4_no_ram_envs[seed]
 

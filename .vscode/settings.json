@@ -1,3 +1,11 @@
 {
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "python.envFile": "${workspaceFolder}/.conda",
+    "python.experiments.optInto": [
+    ],
+    "python.terminal.launchArgs": [
+    ],
+    "terminal.integrated.env.linux": {
+    "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+    }
 }

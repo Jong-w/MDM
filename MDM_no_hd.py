@@ -1,13 +1,37 @@
 import torch
 from torch import nn
 from torch.nn.functional import cosine_similarity as d_cos, normalize
+from torch.nn.functional import mse_loss
 
+import cv2
+from copy import deepcopy
 from utils import init_hidden, weight_init
 from preprocess import Preprocessor
 from dilated_lstm import DilatedLSTM
 import numpy as np
 import random
 import gc
+
+
+def get_atari_obs(obs, screen_size=84):
+    """Get the observation from the Atari environment and preprocess it.
+
+    Args:
+        obs (np.ndarray): observation from the environment
+        screen_size (int, optional): size of the screen. Defaults to 84.
+
+    Returns:
+        np.ndarray: preprocessed observation
+    """
+    obs = cv2.resize(obs, (screen_size, screen_size),
+            interpolation=cv2.INTER_AREA)
+    obs = obs.transpose((2, 0, 1))
+    obs = np.asarray(obs, dtype=np.float32) / 255.0
+    obs = torch.tensor(obs, dtype=torch.float32)
+    return obs
+
+
+
 class MDM_no_hd(nn.Module):
     def __init__(self,
                  num_workers,
@@ -188,6 +212,180 @@ class MDM_no_hd(nn.Module):
         goals_2 = [torch.zeros_like(template_2).to(self.device) for _ in range(2 * self.time_horizon[1] + 1)]
         masks = [torch.ones(self.num_workers, 1).to(self.device) for _ in range(2 * self.time_horizon[4] + 1)]
         return goals_5, states_total, goals_4, goals_3, goals_2, masks
+    
+    def finding_goal_alike(self, x, states, goals_2, goals_3, \
+                            goals_4, goals_5, hierarchies_selected, masks, xs, env):
+        losses = []
+
+        # generate a tons of states in self.c steps and collect them
+        goals = goals_2
+
+        for ii in range(len(goals)):
+            if ii-self.time_horizon[1] < 0:
+                continue
+            if not torch.all(goals[ii]==0) and not torch.all(states[ii-self.time_horizon[1]]==0):
+                print(ii)
+                # mse_loss = nn.MSELoss()
+                xs_0 = deepcopy(xs)
+                x_0 = deepcopy(x)
+                env_0 = deepcopy(env)
+                goals_0_2 = deepcopy([goal.detach() for goal in goals_2])
+                goals_0_3 = deepcopy([goal.detach() for goal in goals_3])
+                goals_0_4 = deepcopy([goal.detach() for goal in goals_4])
+                goals_0_5 = deepcopy([goal.detach() for goal in goals_5])
+                model_self_hidden = deepcopy([hidden[0] for hidden in self.hidden_percept])
+
+                states_0 = deepcopy(states)
+                masks_0 = deepcopy(masks)
+                
+                states_goal_9_2 = []
+                states_goal_9_3 = []
+                states_goal_9_4 = []
+                states_goal_9_5 = []
+                losses_9_2 = []
+                losses_9_3 = []
+                losses_9_4 = []
+                losses_9_5 = []
+                x_9 = []
+
+                for ep in range(int(100)):
+                    xs_purely = []
+                    zs_purely = []
+                    xs_ep = deepcopy(xs_0)
+                    env_ep = deepcopy(env_0)
+
+
+                    goals_ep_2 = deepcopy(goals_0_2)
+                    goals_ep_3 = deepcopy(goals_0_3)
+                    goals_ep_4 = deepcopy(goals_0_4)
+                    goals_ep_5 = deepcopy(goals_0_5)
+
+
+                    states_ep = deepcopy(states_0)
+                    masks_ep = deepcopy(masks_0)
+                    hierarchies_selected_ = deepcopy(hierarchies_selected)
+                    states_goal_ep_2 = []
+                    states_goal_ep_3 = []
+                    states_goal_ep_4 = []
+                    states_goal_ep_5 = []
+                    loss_ep_2 = []
+                    loss_ep_3 = []
+                    loss_ep_4 = []
+                    loss_ep_5 = []
+                    
+                    template_0 = torch.zeros(1, self.hidden_dim[4])
+                    self_goal0 = [torch.zeros_like(template_0).to(self.device) for _ in range(2 * self.time_horizon[4] + 1)]
+
+                    # xs_purely.append(torch.tensor(x_0.transpose((2, 0, 1))))
+                    xs_purely.append(torch.tensor(x_0.transpose((0, 3, 1, 2))))
+                    _x = self.preprocessor(x_0)
+
+                    for step in range(self.time_horizon[1]*5):
+                        _x = _x.clone()
+                        z = self.percept(_x, model_self_hidden, masks_ep[-1])
+                        # zs_purely.append(z)
+
+                        goal_5_vanilla, hidden_5, value_5 = self.Hierarchy5_forth(z, (self.hidden_5[0][:1],self.hidden_5[1][:1]), masks_ep[-1])
+                        goal_4_vanilla, hidden_4, value_4 = self.Hierarchy4_forth(z, (self.hidden_4[0][:1],self.hidden_4[1][:1]), masks_ep[-1])
+                        goal_3_vanilla, hidden_3, value_3 = self.Hierarchy3_forth(z, (self.hidden_3[0][:1],self.hidden_3[1][:1]), masks_ep[-1])
+                        goal_2_vanilla, hidden_2, value_2 = self.Hierarchy2_forth(z, (self.hidden_2[0][:1],self.hidden_2[1][:1]), masks_ep[-1])
+
+                        goal_5_norm, goal_4_norm, goal_3_norm, goal_2_norm = self.goal_normalizer(goal_5_vanilla, goal_4_vanilla, goal_3_vanilla, goal_2_vanilla)
+
+                        if ((step % 300) == 0):
+                            hierarchies_selected_, hidden_policy_network = self.policy_network(z, goal_5_vanilla, goal_4_vanilla, goal_3_vanilla, hierarchies_selected_, self.time_horizon, (self.hidden_policy_network[0][:1], self.hidden_policy_network[1][:1]), masks_ep[-1], step)
+
+                        goal_5 = self.Hierarchy5_back.forward_singlebatch(goal_5_norm, self_goal0, hierarchies_selected_[:, 0])
+                        goal_4 = self.Hierarchy4_back.forward_singlebatch(goal_4_norm, goal_5, hierarchies_selected_[:, 1])
+                        goal_3 = self.Hierarchy3_back.forward_singlebatch(goal_3_norm, goal_4, hierarchies_selected_[:, 2])
+                        goal_2 = self.Hierarchy2_back(goal_2_norm, goal_3)
+            
+                        # Ensure that we only have a list of size 2*c + 1, and we use FiLo
+                        if len(goals_5) > (2 * self.time_horizon[4] + 1):
+                            goals_ep_5.pop(0)
+                            states_ep.pop(0)
+
+                        if len(goals_4) > (2 * self.time_horizon[3] + 1):
+                            goals_ep_4.pop(0)
+
+                        if len(goals_3) > (2 * self.time_horizon[2] + 1):
+                            goals_ep_3.pop(0)
+
+                        if len(goals_2) > (2 * self.time_horizon[1] + 1):
+                            goals_ep_2.pop(0)
+
+                        goals_ep_5.append(goal_5[:1])
+                        goals_ep_4.append(goal_4[:1])
+                        goals_ep_3.append(goal_3[:1])
+                        goals_ep_2.append(goal_2[:1])
+                        states_ep.append(z.detach())
+
+                        if torch.any(torch.isnan(goal_2)):
+                            print('wtf')
+
+
+                        states_goal_ep_2.append([goals_ep_2[-self.time_horizon[1]-1] + states_ep[-self.time_horizon[1]-1], states_ep[-1]])
+                        states_goal_ep_3.append([goals_ep_3[-self.time_horizon[2]-1] + states_ep[-self.time_horizon[2]-1], states_ep[-1]])
+                        states_goal_ep_4.append([goals_ep_4[-self.time_horizon[3]-1] + states_ep[-self.time_horizon[3]-1], states_ep[-1]])
+                        states_goal_ep_5.append([goals_ep_5[-self.time_horizon[4]-1] + states_ep[-self.time_horizon[4]-1], states_ep[-1]])
+
+                        loss_2 = mse_loss(states_goal_ep_2[-1][0],  states_goal_ep_2[-1][1])
+                        loss_3 = mse_loss(states_goal_ep_3[-1][0],  states_goal_ep_3[-1][1])
+                        loss_4 = mse_loss(states_goal_ep_4[-1][0],  states_goal_ep_4[-1][1])
+                        loss_5 = mse_loss(states_goal_ep_5[-1][0],  states_goal_ep_5[-1][1])
+
+                        loss_ep_2.append(loss_2.item())
+                        loss_ep_3.append(loss_3.item())
+                        loss_ep_4.append(loss_4.item())
+                        loss_ep_5.append(loss_5.item())
+
+                        action_dist, hidden_1, value_1 = self.Hierarchy1(z, goals_ep_2[:self.time_horizon[1] + 1], (self.hidden_1[0][:1], self.hidden_1[1][:1]), masks_ep[-1])
+
+                        action = torch.argmax(action_dist)
+                        x_true, _, done, _ = env_ep.step(action)
+                        x_true = get_atari_obs(x_true)
+                        if done:
+                            dd = 1.0
+                        else:
+                            dd = 0.0
+
+                        # mask = torch.FloatTensor(1 - done).unsqueeze(-1).to(self.args.device)
+                        mask = torch.FloatTensor([1.0 - dd]).reshape(1,1).to(self.args.device)
+                        if torch.isnan(mask):
+                            print('wtf')
+
+                        masks_ep.pop(0)
+                        masks_ep.append(mask)
+                        xs_ep.pop(0)
+                        xs_ep.append(x_true)
+                        xs_purely.append(x_true.unsqueeze(0))
+
+                        _x = self.preprocessor(x_true.unsqueeze(0))
+
+                        if done:
+                            break
+
+                    # print('totally collected samples in the episode: ', len(states_goal_ep))
+                    # loss_2_ = torch.min(torch.tensor(loss_ep_2))
+                    # loss_3_ = torch.min(torch.tensor(loss_ep_3))
+                    # loss_4_ = torch.min(torch.tensor(loss_ep_4))
+                    # loss_5_ = torch.min(torch.tensor(loss_ep_5))
+
+                    # print(f'ep: {ep}, total loss: {loss_.item()}')                    
+                    states_goal_9_2.append(states_goal_ep_2)
+                    states_goal_9_3.append(states_goal_ep_3)
+                    states_goal_9_4.append(states_goal_ep_4)
+                    states_goal_9_5.append(states_goal_ep_5)
+                    losses_9_2.append(loss_ep_2)
+                    losses_9_3.append(loss_ep_3)
+                    losses_9_4.append(loss_ep_4)
+                    losses_9_5.append(loss_ep_5)
+                    x_9.append(xs_purely[:-1])
+                return (states_goal_9_2, states_goal_9_3, states_goal_9_4, states_goal_9_5), \
+                        (losses_9_2, losses_9_3, losses_9_4, losses_9_5), x_9
+                
+            else:
+                return None  
 
 class Perception(nn.Module):
     def __init__(self, d, time_horizon):
@@ -277,6 +475,16 @@ class Hierarchy5_back(nn.Module):
         goal = Normalizer(goal)
 
         return goal
+    
+    def forward_singlebatch(self, goal_norm, goal_up, hierarchies_selected):
+        #goal_up = self.linear(goal_up)
+        hierarchies_selected = hierarchies_selected.detach().reshape(1, 1)
+        goal_norm = hierarchies_selected.expand(self.num_workers, self.hidden_dim) * goal_norm
+        goal = goal_norm #+ goal_up
+
+        goal = Normalizer(goal)
+
+        return goal
 
     def state_goal_cosine(self, states, goals, masks):
 
@@ -324,6 +532,16 @@ class Hierarchy4_back(nn.Module):
 
         return goal
 
+    def forward_singlebatch(self, goal_norm, goal_up, hierarchies_selected):
+        goal_up = self.linear(goal_up.detach())
+        hierarchies_selected = hierarchies_selected.detach().reshape(1, 1)
+        goal_norm = hierarchies_selected.expand(self.num_workers, self.hidden_dim) * goal_norm
+        goal = goal_up + goal_norm
+
+        goal = Normalizer(goal)
+
+        return goal
+
     def state_goal_cosine(self, states, goals, masks):
 
         t = self.time_horizon
@@ -363,6 +581,16 @@ class Hierarchy3_back(nn.Module):
         goal_up = self.linear(goal_up.detach())
         hierarchies_selected = hierarchies_selected.detach().reshape(self.num_workers, 1)
         #goal_norm = hierarchies_selected.expand(self.num_workers, self.hidden_dim) * goal_norm
+        goal = goal_up + goal_norm
+
+        goal = Normalizer(goal)
+
+        return goal
+
+    def forward_singlebatch(self, goal_norm, goal_up, hierarchies_selected):
+        goal_up = self.linear(goal_up.detach())
+        hierarchies_selected = hierarchies_selected.detach().reshape(1, 1)
+        goal_norm = hierarchies_selected.expand(self.num_workers, self.hidden_dim) * goal_norm
         goal = goal_up + goal_norm
 
         goal = Normalizer(goal)
